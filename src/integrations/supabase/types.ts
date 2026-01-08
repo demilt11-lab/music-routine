@@ -14,7 +14,229 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      activity_types: {
+        Row: {
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      generated_playlists: {
+        Row: {
+          activity_type_id: string
+          ai_reasoning: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          song_recommendations: Json | null
+          user_id: string
+        }
+        Insert: {
+          activity_type_id: string
+          ai_reasoning?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          song_recommendations?: Json | null
+          user_id: string
+        }
+        Update: {
+          activity_type_id?: string
+          ai_reasoning?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          song_recommendations?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_playlists_activity_type_id_fkey"
+            columns: ["activity_type_id"]
+            isOneToOne: false
+            referencedRelation: "activity_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      listening_sessions: {
+        Row: {
+          activity_type_id: string
+          created_at: string
+          ended_at: string | null
+          id: string
+          mood_after: string | null
+          mood_before: string | null
+          name: string | null
+          notes: string | null
+          started_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_type_id: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          mood_after?: string | null
+          mood_before?: string | null
+          name?: string | null
+          notes?: string | null
+          started_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_type_id?: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          mood_after?: string | null
+          mood_before?: string | null
+          name?: string | null
+          notes?: string | null
+          started_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listening_sessions_activity_type_id_fkey"
+            columns: ["activity_type_id"]
+            isOneToOne: false
+            referencedRelation: "activity_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      session_songs: {
+        Row: {
+          id: string
+          play_duration_ms: number | null
+          played_at: string
+          session_id: string
+          skipped: boolean | null
+          song_id: string
+        }
+        Insert: {
+          id?: string
+          play_duration_ms?: number | null
+          played_at?: string
+          session_id: string
+          skipped?: boolean | null
+          song_id: string
+        }
+        Update: {
+          id?: string
+          play_duration_ms?: number | null
+          played_at?: string
+          session_id?: string
+          skipped?: boolean | null
+          song_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_songs_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "listening_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_songs_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      songs: {
+        Row: {
+          album: string | null
+          artist: string
+          created_at: string
+          danceability: number | null
+          duration_ms: number | null
+          energy: number | null
+          id: string
+          spotify_id: string | null
+          tempo: number | null
+          title: string
+          user_id: string | null
+          valence: number | null
+        }
+        Insert: {
+          album?: string | null
+          artist: string
+          created_at?: string
+          danceability?: number | null
+          duration_ms?: number | null
+          energy?: number | null
+          id?: string
+          spotify_id?: string | null
+          tempo?: number | null
+          title: string
+          user_id?: string | null
+          valence?: number | null
+        }
+        Update: {
+          album?: string | null
+          artist?: string
+          created_at?: string
+          danceability?: number | null
+          duration_ms?: number | null
+          energy?: number | null
+          id?: string
+          spotify_id?: string | null
+          tempo?: number | null
+          title?: string
+          user_id?: string | null
+          valence?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
