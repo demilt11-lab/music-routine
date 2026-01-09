@@ -38,6 +38,71 @@ export type Database = {
         }
         Relationships: []
       }
+      biometric_readings: {
+        Row: {
+          created_at: string
+          device_type: string | null
+          eeg_alpha: number | null
+          eeg_beta: number | null
+          eeg_delta: number | null
+          eeg_gamma: number | null
+          eeg_theta: number | null
+          focus_score: number | null
+          heart_rate: number | null
+          heart_rate_variability: number | null
+          id: string
+          recorded_at: string
+          relaxation_score: number | null
+          session_id: string | null
+          stress_level: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_type?: string | null
+          eeg_alpha?: number | null
+          eeg_beta?: number | null
+          eeg_delta?: number | null
+          eeg_gamma?: number | null
+          eeg_theta?: number | null
+          focus_score?: number | null
+          heart_rate?: number | null
+          heart_rate_variability?: number | null
+          id?: string
+          recorded_at?: string
+          relaxation_score?: number | null
+          session_id?: string | null
+          stress_level?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_type?: string | null
+          eeg_alpha?: number | null
+          eeg_beta?: number | null
+          eeg_delta?: number | null
+          eeg_gamma?: number | null
+          eeg_theta?: number | null
+          focus_score?: number | null
+          heart_rate?: number | null
+          heart_rate_variability?: number | null
+          id?: string
+          recorded_at?: string
+          relaxation_score?: number | null
+          session_id?: string | null
+          stress_level?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "biometric_readings_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "listening_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       generated_playlists: {
         Row: {
           activity_type_id: string
@@ -126,6 +191,33 @@ export type Database = {
           },
         ]
       }
+      music_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          music_user_token: string | null
+          provider: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          music_user_token?: string | null
+          provider?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          music_user_token?: string | null
+          provider?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -195,6 +287,7 @@ export type Database = {
       songs: {
         Row: {
           album: string | null
+          apple_music_id: string | null
           artist: string
           created_at: string
           danceability: number | null
@@ -209,6 +302,7 @@ export type Database = {
         }
         Insert: {
           album?: string | null
+          apple_music_id?: string | null
           artist: string
           created_at?: string
           danceability?: number | null
@@ -223,6 +317,7 @@ export type Database = {
         }
         Update: {
           album?: string | null
+          apple_music_id?: string | null
           artist?: string
           created_at?: string
           danceability?: number | null
