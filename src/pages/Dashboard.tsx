@@ -6,8 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { 
   Music, LogOut, Moon, Dumbbell, BookOpen, Coffee, Car, 
-  Sparkles, Loader2, Play, Clock, ListMusic 
+  Sparkles, Loader2, Play, Clock, ListMusic, Headphones
 } from "lucide-react";
+import { MusicTabs } from "@/components/music/MusicTabs";
 import type { User } from "@supabase/supabase-js";
 
 interface ActivityType {
@@ -152,13 +153,22 @@ const Dashboard = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 pb-32">
         {/* Welcome Section */}
         <section className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Welcome back!</h1>
           <p className="text-muted-foreground">
-            Generate AI-optimized playlists for your activities
+            Play music from multiple sources - no API keys required!
           </p>
+        </section>
+
+        {/* Music Player Section */}
+        <section className="mb-12">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <Headphones className="w-5 h-5 text-primary" />
+            Your Music
+          </h2>
+          <MusicTabs />
         </section>
 
         {/* Activity Cards */}
