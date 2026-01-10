@@ -6,9 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { 
   Music, LogOut, Moon, Dumbbell, BookOpen, Coffee, Car, 
-  Sparkles, Loader2, Play, Clock, ListMusic, Headphones
+  Sparkles, Loader2, Play, Clock, ListMusic, Headphones, Heart
 } from "lucide-react";
 import { MusicTabs } from "@/components/music/MusicTabs";
+import { BiometricMonitor } from "@/components/biometrics/BiometricMonitor";
+import { SessionInsights } from "@/components/biometrics/SessionInsights";
 import type { User } from "@supabase/supabase-js";
 
 interface ActivityType {
@@ -162,6 +164,11 @@ const Dashboard = () => {
           </p>
         </section>
 
+        {/* Biometric Monitor */}
+        <section className="mb-8">
+          <BiometricMonitor />
+        </section>
+
         {/* Music Player Section */}
         <section className="mb-12">
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
@@ -253,6 +260,11 @@ const Dashboard = () => {
               ))}
             </div>
           )}
+        </section>
+
+        {/* Session Analytics & Insights */}
+        <section className="mb-12">
+          <SessionInsights />
         </section>
       </main>
     </div>
