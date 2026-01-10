@@ -11,6 +11,7 @@ import {
 import { MusicTabs } from "@/components/music/MusicTabs";
 import { BiometricMonitor } from "@/components/biometrics/BiometricMonitor";
 import { SessionInsights } from "@/components/biometrics/SessionInsights";
+import { BiometricCharts } from "@/components/biometrics/BiometricCharts";
 import type { User } from "@supabase/supabase-js";
 
 interface ActivityType {
@@ -260,6 +261,11 @@ const Dashboard = () => {
               ))}
             </div>
           )}
+        </section>
+
+        {/* Biometric Charts & Visualizations */}
+        <section className="mb-12">
+          <BiometricCharts />
         </section>
 
         {/* Session Analytics & Insights */}
