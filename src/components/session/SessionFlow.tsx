@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useBiometricTracking } from "@/hooks/useBiometricTracking";
 import { DeviceConnector } from "./DeviceConnector";
+import { AdaptiveMusicPanel } from "./AdaptiveMusicPanel";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -395,6 +396,24 @@ export function SessionFlow() {
                 className="h-3"
               />
             </div>
+
+            {/* Adaptive Music Recommendations */}
+            {selectedActivity && (
+              <AdaptiveMusicPanel
+                activityType={selectedActivity.name}
+                biometricState={{
+                  heartRate: biometricState.currentReading?.heartRate || 70,
+                  stressLevel: biometricState.currentReading?.stressLevel || 30,
+                  focusScore: biometricState.currentReading?.focusScore || 50,
+                  relaxationScore: biometricState.currentReading?.relaxationScore || 50,
+                  flowState: biometricState.flowState,
+                }}
+                isTracking={biometricState.isTracking}
+                onSongRecommended={(song) => {
+                  toast.success(`Recommended: "${song.title}" by ${song.artist}`);
+                }}
+              />
+            )}
 
             <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
