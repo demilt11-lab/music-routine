@@ -12,6 +12,7 @@ import { MusicTabs } from "@/components/music/MusicTabs";
 import { BiometricMonitor } from "@/components/biometrics/BiometricMonitor";
 import { SessionInsights } from "@/components/biometrics/SessionInsights";
 import { BiometricCharts } from "@/components/biometrics/BiometricCharts";
+import { SessionFlow } from "@/components/session/SessionFlow";
 import type { User } from "@supabase/supabase-js";
 
 interface ActivityType {
@@ -163,6 +164,11 @@ const Dashboard = () => {
           <p className="text-muted-foreground">
             Play music from multiple sources - no API keys required!
           </p>
+        </section>
+
+        {/* Session Flow - Dedicated Listening Session */}
+        <section className="mb-8">
+          <SessionFlow />
         </section>
 
         {/* Biometric Monitor */}
