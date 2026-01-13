@@ -39,10 +39,12 @@ interface UseJamendoReturn {
   search: (params: JamendoSearchParams) => Promise<void>;
   loadFeatured: () => Promise<void>;
   loadByMood: (mood: string) => Promise<void>;
+  searchByTempoEnergy: (targetTempo: number, targetEnergy: number, activityType?: string) => Promise<JamendoTrack[]>;
   play: (track: JamendoTrack) => void;
   pause: () => void;
   togglePlay: () => void;
   seek: (time: number) => void;
+  setOnTrackEnd: (callback: (() => void) | null) => void;
   audioRef: React.RefObject<HTMLAudioElement>;
 }
 
@@ -56,6 +58,7 @@ export function useJamendo(): UseJamendoReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const onTrackEndRef = useRef<(() => void) | null>(null);
 
   const buildUrl = (endpoint: string, params: Record<string, string | number | undefined>) => {
     const url = new URL(`https://api.jamendo.com/v3.0/${endpoint}`);
@@ -154,6 +157,53 @@ export function useJamendo(): UseJamendoReturn {
     });
   }, [search]);
 
+  // Search for tracks matching tempo and energy targets from AI recommendations
+  const searchByTempoEnergy = useCallback(async (
+    targetTempo: number, 
+    targetEnergy: number, 
+    activityType?: string
+  ): Promise<JamendoTrack[]> => {
+    try {
+      // Map tempo to Jamendo speed parameter
+      let speed: "low" | "medium" | "high" | "veryhigh" | undefined;
+      if (targetTempo < 80) speed = "low";
+      else if (targetTempo < 110) speed = "medium";
+      else if (targetTempo < 140) speed = "high";
+      else speed = "veryhigh";
+
+      // Map energy to acoustic/electric preference
+      const acousticelectric = targetEnergy < 0.4 ? "acoustic" : "electric";
+
+      // Get tags based on activity type
+      const activityTags: Record<string, string> = {
+        sleep: "ambient+relaxing",
+        workout: "energetic+electronic",
+        study: "focus+instrumental",
+        relax: "chillout+peaceful",
+        commute: "pop+upbeat",
+      };
+      const tags = activityType ? activityTags[activityType.toLowerCase()] : undefined;
+
+      const url = buildUrl("tracks", {
+        tags,
+        speed,
+        acousticelectric,
+        vocalinstrumental: targetEnergy < 0.5 ? "instrumental" : undefined,
+        limit: 10,
+        include: "musicinfo",
+        boost: "popularity_total",
+      });
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      return data.results || [];
+    } catch (err) {
+      console.error("Jamendo tempo/energy search error:", err);
+      return [];
+    }
+  }, []);
+
   const play = useCallback((track: JamendoTrack) => {
     setCurrentTrack(track);
     if (audioRef.current) {
@@ -184,6 +234,10 @@ export function useJamendo(): UseJamendoReturn {
     }
   }, []);
 
+  const setOnTrackEnd = useCallback((callback: (() => void) | null) => {
+    onTrackEndRef.current = callback;
+  }, []);
+
   // Audio event listeners
   useEffect(() => {
     const audio = audioRef.current;
@@ -191,7 +245,13 @@ export function useJamendo(): UseJamendoReturn {
 
     const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
     const handleDurationChange = () => setDuration(audio.duration);
-    const handleEnded = () => setIsPlaying(false);
+    const handleEnded = () => {
+      setIsPlaying(false);
+      // Call the onTrackEnd callback for auto-play
+      if (onTrackEndRef.current) {
+        onTrackEndRef.current();
+      }
+    };
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
 
@@ -222,10 +282,12 @@ export function useJamendo(): UseJamendoReturn {
     search,
     loadFeatured,
     loadByMood,
+    searchByTempoEnergy,
     play,
     pause,
     togglePlay,
     seek,
+    setOnTrackEnd,
     audioRef,
   };
 }

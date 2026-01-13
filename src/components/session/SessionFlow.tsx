@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { 
   Play, Square, Music, Activity, Clock, Heart, 
   ChevronRight, Check, Smile, Meh, Frown, Loader2,
-  Moon, Dumbbell, BookOpen, Coffee, Car, Sparkles
+  Moon, Dumbbell, BookOpen, Coffee, Car, Sparkles, Volume2
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,12 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useBiometricTracking } from "@/hooks/useBiometricTracking";
+import { useAutoPlayQueue } from "@/hooks/useAutoPlayQueue";
+import { useJamendo, JamendoTrack } from "@/hooks/useJamendo";
+import { useAdaptiveMusic } from "@/hooks/useAdaptiveMusic";
 import { DeviceConnector } from "./DeviceConnector";
 import { AdaptiveMusicPanel } from "./AdaptiveMusicPanel";
+import { MusicPlayer } from "@/components/music/MusicPlayer";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +60,18 @@ export function SessionFlow() {
   const [isSaving, setIsSaving] = useState(false);
 
   const { state: biometricState, startTracking, stopTracking, addReading, saveReadingsToSession } = useBiometricTracking();
+  
+  // Auto-play queue management
+  const autoPlayQueue = useAutoPlayQueue();
+  
+  // Jamendo music player for actual playback
+  const jamendo = useJamendo();
+  
+  // Adaptive music recommendations
+  const adaptiveMusic = useAdaptiveMusic(selectedActivity?.name || "study");
+  
+  // Track last processed recommendation to avoid duplicate queue additions
+  const lastRecommendationRef = useRef<string | null>(null);
 
   // Fetch activity types
   useEffect(() => {
@@ -76,6 +92,93 @@ export function SessionFlow() {
     }
     return () => clearInterval(interval);
   }, [step, startTime]);
+
+  // Auto-play: Handle track ending and queue next song
+  useEffect(() => {
+    if (!autoPlayQueue.state.isEnabled) return;
+
+    jamendo.setOnTrackEnd(() => {
+      const nextTrack = autoPlayQueue.onTrackEnded();
+      if (nextTrack && nextTrack.audioUrl) {
+        // Find the Jamendo track with this URL and play it
+        const jamendoTrack = jamendo.tracks.find(t => t.audio === nextTrack.audioUrl);
+        if (jamendoTrack) {
+          jamendo.play(jamendoTrack);
+        }
+      }
+    });
+
+    return () => {
+      jamendo.setOnTrackEnd(null);
+    };
+  }, [autoPlayQueue.state.isEnabled, autoPlayQueue, jamendo]);
+
+  // Auto-play: When recommendations come in, search Jamendo and queue tracks
+  useEffect(() => {
+    const recommendation = adaptiveMusic.state.currentRecommendation;
+    if (!autoPlayQueue.state.isEnabled || !recommendation) return;
+
+    // Avoid processing the same recommendation twice
+    const recommendationKey = `${recommendation.targetTempo}-${recommendation.targetEnergy}`;
+    if (lastRecommendationRef.current === recommendationKey) return;
+    lastRecommendationRef.current = recommendationKey;
+
+    const fetchAndQueueTracks = async () => {
+      const tracks = await jamendo.searchByTempoEnergy(
+        recommendation.targetTempo,
+        recommendation.targetEnergy,
+        selectedActivity?.name
+      );
+
+      if (tracks.length > 0) {
+        const queuedTracks = tracks.slice(0, 5).map((track: JamendoTrack) => ({
+          id: track.id,
+          title: track.name,
+          artist: track.artist_name,
+          tempo: recommendation.targetTempo,
+          energy: recommendation.targetEnergy,
+          audioUrl: track.audio,
+          source: "jamendo" as const,
+          reason: recommendation.reasoning,
+        }));
+
+        autoPlayQueue.addToQueue(queuedTracks);
+
+        // If nothing is playing, start the first track
+        if (!jamendo.currentTrack && queuedTracks.length > 0) {
+          const firstTrack = tracks[0];
+          jamendo.play(firstTrack);
+          autoPlayQueue.skipToNext(); // Move to index 0
+          toast.success(`Auto-playing: "${firstTrack.name}" based on your biometrics`);
+        }
+      }
+    };
+
+    fetchAndQueueTracks();
+  }, [adaptiveMusic.state.currentRecommendation, autoPlayQueue.state.isEnabled, selectedActivity?.name]);
+
+  // Update adaptive music with biometric data
+  useEffect(() => {
+    if (biometricState.isTracking && biometricState.currentReading) {
+      adaptiveMusic.updateBiometrics({
+        heartRate: biometricState.currentReading.heartRate || 70,
+        stressLevel: biometricState.currentReading.stressLevel || 30,
+        focusScore: biometricState.currentReading.focusScore || 50,
+        relaxationScore: biometricState.currentReading.relaxationScore || 50,
+        flowState: biometricState.flowState,
+      });
+    }
+  }, [biometricState.currentReading, biometricState.flowState, biometricState.isTracking, adaptiveMusic]);
+
+  // Update current song info for adaptive music
+  useEffect(() => {
+    if (jamendo.currentTrack) {
+      adaptiveMusic.setCurrentSong({
+        title: jamendo.currentTrack.name,
+        artist: jamendo.currentTrack.artist_name,
+      });
+    }
+  }, [jamendo.currentTrack, adaptiveMusic]);
 
   const formatTime = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600);
@@ -397,7 +500,46 @@ export function SessionFlow() {
               />
             </div>
 
-            {/* Adaptive Music Recommendations */}
+            {/* Now Playing - Integrated Music Player */}
+            {jamendo.currentTrack && (
+              <div className="p-4 rounded-lg bg-muted/50 border">
+                <div className="flex items-center gap-2 mb-3">
+                  <Volume2 className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium">Now Playing</span>
+                  {autoPlayQueue.state.isEnabled && (
+                    <Badge variant="secondary" className="text-xs">Auto-Play</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  {jamendo.currentTrack.image && (
+                    <img 
+                      src={jamendo.currentTrack.image} 
+                      alt={jamendo.currentTrack.name}
+                      className="w-12 h-12 rounded-lg object-cover"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{jamendo.currentTrack.name}</p>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {jamendo.currentTrack.artist_name}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={jamendo.togglePlay}
+                  >
+                    {jamendo.isPlaying ? (
+                      <Square className="w-4 h-4" />
+                    ) : (
+                      <Play className="w-4 h-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Adaptive Music Recommendations with Auto-Play */}
             {selectedActivity && (
               <AdaptiveMusicPanel
                 activityType={selectedActivity.name}
@@ -409,11 +551,40 @@ export function SessionFlow() {
                   flowState: biometricState.flowState,
                 }}
                 isTracking={biometricState.isTracking}
+                autoPlayEnabled={autoPlayQueue.state.isEnabled}
+                onAutoPlayToggle={(enabled) => {
+                  if (enabled) {
+                    autoPlayQueue.enableAutoPlay();
+                    // Load initial tracks for the activity
+                    jamendo.loadByMood(selectedActivity.name);
+                  } else {
+                    autoPlayQueue.disableAutoPlay();
+                  }
+                }}
+                queue={autoPlayQueue.state.queue}
+                currentQueueTrack={autoPlayQueue.getCurrentTrack()}
+                onSkipNext={() => {
+                  const nextTrack = autoPlayQueue.skipToNext();
+                  if (nextTrack && nextTrack.audioUrl) {
+                    const jamendoTrack = jamendo.tracks.find(t => t.audio === nextTrack.audioUrl);
+                    if (jamendoTrack) {
+                      jamendo.play(jamendoTrack);
+                    }
+                  }
+                }}
                 onSongRecommended={(song) => {
                   toast.success(`Recommended: "${song.title}" by ${song.artist}`);
+                  // If auto-play is enabled, the track will be queued automatically
+                  if (!autoPlayQueue.state.isEnabled) {
+                    // Manual mode: just notify
+                    toast.info("Enable Auto-Play to automatically queue recommended songs");
+                  }
                 }}
               />
             )}
+
+            {/* Hidden audio element for Jamendo playback */}
+            <audio ref={jamendo.audioRef} className="hidden" />
 
             <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">

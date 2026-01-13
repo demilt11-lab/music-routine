@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { 
   Sparkles, Zap, Music2, TrendingUp, TrendingDown, 
-  Minus, RefreshCw, Loader2, Radio, Target, Brain
+  Minus, RefreshCw, Loader2, Radio, Target, Brain,
+  PlayCircle, PauseCircle, ListMusic, SkipForward
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,17 @@ import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { useAdaptiveMusic } from "@/hooks/useAdaptiveMusic";
 import { cn } from "@/lib/utils";
+
+interface QueuedTrack {
+  id: string;
+  title: string;
+  artist: string;
+  tempo: number;
+  energy: number;
+  audioUrl?: string;
+  source: "jamendo" | "local" | "recommendation";
+  reason?: string;
+}
 
 interface AdaptiveMusicPanelProps {
   activityType: string;
@@ -22,6 +34,11 @@ interface AdaptiveMusicPanelProps {
   };
   isTracking: boolean;
   onSongRecommended?: (song: { title: string; artist: string; tempo: number; energy: number }) => void;
+  autoPlayEnabled?: boolean;
+  onAutoPlayToggle?: (enabled: boolean) => void;
+  queue?: QueuedTrack[];
+  onSkipNext?: () => void;
+  currentQueueTrack?: QueuedTrack | null;
 }
 
 const actionIcons: Record<string, React.ReactNode> = {
@@ -46,7 +63,12 @@ export function AdaptiveMusicPanel({
   activityType, 
   biometricState, 
   isTracking,
-  onSongRecommended 
+  onSongRecommended,
+  autoPlayEnabled = false,
+  onAutoPlayToggle,
+  queue = [],
+  onSkipNext,
+  currentQueueTrack,
 }: AdaptiveMusicPanelProps) {
   const { 
     state, 
@@ -103,6 +125,25 @@ export function AdaptiveMusicPanel({
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
+            {/* Auto-play toggle */}
+            {onAutoPlayToggle && (
+              <div className="flex items-center gap-2 mr-2">
+                <Button
+                  variant={autoPlayEnabled ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => onAutoPlayToggle(!autoPlayEnabled)}
+                  disabled={!isTracking}
+                  className="gap-1"
+                >
+                  {autoPlayEnabled ? (
+                    <PauseCircle className="w-4 h-4" />
+                  ) : (
+                    <PlayCircle className="w-4 h-4" />
+                  )}
+                  Auto
+                </Button>
+              </div>
+            )}
             <Switch 
               checked={state.isEnabled} 
               onCheckedChange={handleToggle}
@@ -125,6 +166,38 @@ export function AdaptiveMusicPanel({
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {/* Auto-play Queue Status */}
+        {autoPlayEnabled && queue.length > 0 && (
+          <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <ListMusic className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium">Auto-Play Queue</span>
+                <Badge variant="secondary" className="text-xs">
+                  {queue.length} tracks
+                </Badge>
+              </div>
+              {onSkipNext && queue.length > 1 && (
+                <Button variant="ghost" size="sm" onClick={onSkipNext}>
+                  <SkipForward className="w-4 h-4 mr-1" />
+                  Skip
+                </Button>
+              )}
+            </div>
+            {currentQueueTrack && (
+              <div className="text-sm">
+                <span className="text-muted-foreground">Now: </span>
+                <span className="font-medium">{currentQueueTrack.title}</span>
+                <span className="text-muted-foreground"> by {currentQueueTrack.artist}</span>
+              </div>
+            )}
+            {queue.length > 1 && (
+              <div className="text-xs text-muted-foreground mt-1">
+                Up next: {queue[1]?.title}
+              </div>
+            )}
+          </div>
+        )}
         {!isTracking ? (
           <div className="text-center py-6 text-muted-foreground">
             <Brain className="w-12 h-12 mx-auto mb-3 opacity-50" />
