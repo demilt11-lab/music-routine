@@ -2,12 +2,19 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-interface BiometricState {
+export interface BiometricState {
   heartRate: number;
   stressLevel: number;
   focusScore: number;
   relaxationScore: number;
   flowState: "none" | "entering" | "in-flow" | "exiting";
+  // EEG data (optional)
+  eegAlpha?: number;
+  eegBeta?: number;
+  eegTheta?: number;
+  eegGamma?: number;
+  eegDelta?: number;
+  meditationScore?: number;
 }
 
 interface SongRecommendation {

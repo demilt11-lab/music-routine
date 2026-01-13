@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { 
-  Play, Square, Music, Activity, Clock, Heart, 
+  Play, Square, Music, Activity, Clock, Heart, Brain,
   ChevronRight, Check, Smile, Meh, Frown, Loader2,
   Moon, Dumbbell, BookOpen, Coffee, Car, Sparkles, Volume2
 } from "lucide-react";
@@ -9,14 +9,17 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useBiometricTracking } from "@/hooks/useBiometricTracking";
 import { useAutoPlayQueue } from "@/hooks/useAutoPlayQueue";
 import { useJamendo, JamendoTrack } from "@/hooks/useJamendo";
 import { useAdaptiveMusic } from "@/hooks/useAdaptiveMusic";
 import { DeviceConnector } from "./DeviceConnector";
+import { EEGConnector } from "./EEGConnector";
 import { AdaptiveMusicPanel } from "./AdaptiveMusicPanel";
 import { MusicPlayer } from "@/components/music/MusicPlayer";
+import { EEGReading } from "@/hooks/useMuseEEG";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -57,6 +60,8 @@ export function SessionFlow() {
   const [moodAfter, setMoodAfter] = useState<MoodRating | null>(null);
   const [notes, setNotes] = useState("");
   const [isDeviceConnected, setIsDeviceConnected] = useState(false);
+  const [isEEGConnected, setIsEEGConnected] = useState(false);
+  const [eegMetrics, setEEGMetrics] = useState<{ focus: number; relaxation: number; meditation: number } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const { state: biometricState, startTracking, stopTracking, addReading, saveReadingsToSession } = useBiometricTracking();
@@ -157,18 +162,31 @@ export function SessionFlow() {
     fetchAndQueueTracks();
   }, [adaptiveMusic.state.currentRecommendation, autoPlayQueue.state.isEnabled, selectedActivity?.name]);
 
-  // Update adaptive music with biometric data
+  // Update adaptive music with biometric data (including EEG)
   useEffect(() => {
     if (biometricState.isTracking && biometricState.currentReading) {
+      const currentReading = biometricState.currentReading;
+      
+      // If EEG is connected, use EEG-derived focus and relaxation scores
+      const focusScore = eegMetrics?.focus ?? currentReading.focusScore ?? 50;
+      const relaxationScore = eegMetrics?.relaxation ?? currentReading.relaxationScore ?? 50;
+      
       adaptiveMusic.updateBiometrics({
-        heartRate: biometricState.currentReading.heartRate || 70,
-        stressLevel: biometricState.currentReading.stressLevel || 30,
-        focusScore: biometricState.currentReading.focusScore || 50,
-        relaxationScore: biometricState.currentReading.relaxationScore || 50,
+        heartRate: currentReading.heartRate || 70,
+        stressLevel: currentReading.stressLevel || 30,
+        focusScore,
+        relaxationScore,
         flowState: biometricState.flowState,
+        // Include EEG data if available
+        eegAlpha: currentReading.eegAlpha,
+        eegBeta: currentReading.eegBeta,
+        eegTheta: currentReading.eegTheta,
+        eegGamma: currentReading.eegGamma,
+        eegDelta: currentReading.eegDelta,
+        meditationScore: eegMetrics?.meditation,
       });
     }
-  }, [biometricState.currentReading, biometricState.flowState, biometricState.isTracking, adaptiveMusic]);
+  }, [biometricState.currentReading, biometricState.flowState, biometricState.isTracking, adaptiveMusic, eegMetrics]);
 
   // Update current song info for adaptive music
   useEffect(() => {
@@ -245,6 +263,23 @@ export function SessionFlow() {
       relaxationScore: Math.round(relaxation),
       focusScore: Math.round(focus),
       deviceType: "bluetooth_hr",
+      recordedAt: new Date(),
+    });
+  }, [addReading]);
+
+  const handleEEGUpdate = useCallback((reading: EEGReading, metrics: { focus: number; relaxation: number; meditation: number }) => {
+    setEEGMetrics(metrics);
+    
+    // Update biometric reading with EEG data
+    addReading({
+      eegAlpha: reading.alpha,
+      eegBeta: reading.beta,
+      eegTheta: reading.theta,
+      eegGamma: reading.gamma,
+      eegDelta: reading.delta,
+      focusScore: metrics.focus,
+      relaxationScore: metrics.relaxation,
+      deviceType: "muse_eeg",
       recordedAt: new Date(),
     });
   }, [addReading]);
@@ -408,17 +443,51 @@ export function SessionFlow() {
         {/* Step 2: Connect Device */}
         {step === "connect-device" && (
           <div className="space-y-6">
-            <DeviceConnector
-              onHeartRateUpdate={handleHeartRateUpdate}
-              onConnectionChange={setIsDeviceConnected}
-            />
+            <Tabs defaultValue="heart-rate" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="heart-rate" className="flex items-center gap-2">
+                  <Heart className="w-4 h-4" />
+                  Heart Rate
+                </TabsTrigger>
+                <TabsTrigger value="eeg" className="flex items-center gap-2">
+                  <Brain className="w-4 h-4" />
+                  EEG Headband
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="heart-rate" className="mt-4">
+                <DeviceConnector
+                  onHeartRateUpdate={handleHeartRateUpdate}
+                  onConnectionChange={setIsDeviceConnected}
+                />
+              </TabsContent>
+              
+              <TabsContent value="eeg" className="mt-4">
+                <EEGConnector
+                  onEEGUpdate={handleEEGUpdate}
+                  onConnectionChange={setIsEEGConnected}
+                />
+              </TabsContent>
+            </Tabs>
+
+            {/* Connection Status Summary */}
+            <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-2">
+                <Heart className={cn("w-4 h-4", isDeviceConnected ? "text-green-500" : "text-muted-foreground")} />
+                <span className="text-sm">{isDeviceConnected ? "HR Connected" : "HR Not Connected"}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Brain className={cn("w-4 h-4", isEEGConnected ? "text-purple-500" : "text-muted-foreground")} />
+                <span className="text-sm">{isEEGConnected ? "EEG Connected" : "EEG Not Connected"}</span>
+              </div>
+            </div>
 
             <div className="flex gap-3">
               <Button variant="outline" onClick={() => setStep("select-activity")}>
                 Back
               </Button>
               <Button onClick={handleStartSession} className="flex-1">
-                {isDeviceConnected ? (
+                {isDeviceConnected || isEEGConnected ? (
                   <>
                     <Play className="w-4 h-4 mr-2" />
                     Start Session
