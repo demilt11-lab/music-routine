@@ -11,6 +11,13 @@ interface BiometricState {
   focusScore: number;
   relaxationScore: number;
   flowState: "none" | "entering" | "in-flow" | "exiting";
+  // EEG brainwave data
+  eegAlpha?: number;
+  eegBeta?: number;
+  eegTheta?: number;
+  eegGamma?: number;
+  eegDelta?: number;
+  meditationScore?: number;
 }
 
 interface MusicRecommendation {
@@ -65,7 +72,25 @@ serve(async (req) => {
     // Determine what adjustment is needed
     const adjustment = calculateAdjustment(biometricState, targets, trend);
 
-    const systemPrompt = `You are an AI music therapist specializing in using music to optimize mental states through physiological entrainment. You analyze real-time biometric data and recommend specific music adjustments to guide users toward their target mental state.
+    // Check if EEG data is available
+    const hasEEGData = biometricState.eegAlpha !== undefined;
+    
+    const eegSection = hasEEGData ? `
+## Brainwave Data (EEG):
+- Alpha (8-12 Hz): ${biometricState.eegAlpha?.toFixed(1)} µV - Relaxation, calm focus
+- Beta (12-30 Hz): ${biometricState.eegBeta?.toFixed(1)} µV - Active thinking, concentration
+- Theta (4-8 Hz): ${biometricState.eegTheta?.toFixed(1)} µV - Drowsiness, meditation
+- Gamma (30+ Hz): ${biometricState.eegGamma?.toFixed(1)} µV - Higher cognitive functions
+- Delta (0.5-4 Hz): ${biometricState.eegDelta?.toFixed(1)} µV - Deep sleep
+${biometricState.meditationScore !== undefined ? `- Meditation Score: ${biometricState.meditationScore}%` : ''}
+
+## Brainwave Analysis:
+- Alpha/Beta ratio: ${((biometricState.eegAlpha || 0) / ((biometricState.eegBeta || 0) + 0.001)).toFixed(2)} (higher = more relaxed)
+- Theta/Beta ratio: ${((biometricState.eegTheta || 0) / ((biometricState.eegBeta || 0) + 0.001)).toFixed(2)} (higher = more meditative)
+- Focus indicator: ${biometricState.eegBeta && biometricState.eegTheta ? ((biometricState.eegBeta / (biometricState.eegTheta + biometricState.eegAlpha + 0.001)) > 0.7 ? "High" : "Moderate") : "Unknown"}
+` : "";
+
+    const systemPrompt = `You are an AI music therapist specializing in using music to optimize mental states through physiological entrainment. You analyze real-time biometric data${hasEEGData ? " including brainwave activity" : ""} and recommend specific music adjustments to guide users toward their target mental state.
 
 ## Current User State:
 - Heart Rate: ${biometricState.heartRate} BPM
@@ -73,7 +98,7 @@ serve(async (req) => {
 - Focus Score: ${biometricState.focusScore}%
 - Relaxation Score: ${biometricState.relaxationScore}%
 - Current Flow State: ${biometricState.flowState}
-
+${eegSection}
 ## Current Song:
 ${currentSong ? `"${currentSong.title}" by ${currentSong.artist} (${currentSong.tempo || 'unknown'} BPM, ${Math.round((currentSong.energy || 0.5) * 100)}% energy)` : 'No song currently playing'}
 
@@ -93,18 +118,22 @@ ${trend.description}
 ## Analysis Needed:
 ${adjustment.prompt}
 
-Based on this real-time biometric data, provide immediate music recommendations. Consider:
+Based on this real-time biometric data${hasEEGData ? " and brainwave activity" : ""}, provide immediate music recommendations. Consider:
 1. Music tempo affects heart rate through rhythmic entrainment
 2. Energy levels affect stress and arousal
 3. Familiarity and genre can affect focus and relaxation
 4. Gradual changes are more effective than abrupt ones
+${hasEEGData ? `5. Alpha wave dominance suggests calm focus - maintain with ambient music
+6. Beta wave dominance suggests active thinking - support with moderate tempo
+7. Theta wave increase suggests approaching meditation - use slower, ambient tracks
+8. High gamma may indicate cognitive overload - consider reducing musical complexity` : ""}
 
 Return your response in this exact JSON format:
 {
   "action": "${adjustment.suggestedAction}",
   "targetTempo": 120,
   "targetEnergy": 0.6,
-  "reasoning": "Brief explanation of the physiological reasoning",
+  "reasoning": "Brief explanation of the physiological reasoning${hasEEGData ? " including brainwave analysis" : ""}",
   "suggestedSongs": [
     {
       "title": "Song Name",
