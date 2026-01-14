@@ -12,6 +12,7 @@ import { MusicTabs } from "@/components/music/MusicTabs";
 import { BiometricMonitor } from "@/components/biometrics/BiometricMonitor";
 import { SessionInsights } from "@/components/biometrics/SessionInsights";
 import { BiometricCharts } from "@/components/biometrics/BiometricCharts";
+import { PersonalizedInsights } from "@/components/biometrics/PersonalizedInsights";
 import { SessionFlow } from "@/components/session/SessionFlow";
 import type { User } from "@supabase/supabase-js";
 
@@ -277,6 +278,11 @@ const Dashboard = () => {
         {/* Session Analytics & Insights */}
         <section className="mb-12">
           <SessionInsights />
+        </section>
+
+        {/* Personalized Music Insights */}
+        <section className="mb-12">
+          <PersonalizedInsights />
         </section>
       </main>
     </div>
