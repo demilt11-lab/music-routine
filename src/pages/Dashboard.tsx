@@ -14,6 +14,7 @@ import { SessionInsights } from "@/components/biometrics/SessionInsights";
 import { BiometricCharts } from "@/components/biometrics/BiometricCharts";
 import { PersonalizedInsights } from "@/components/biometrics/PersonalizedInsights";
 import { SessionFlow } from "@/components/session/SessionFlow";
+import { RecommendationEngine } from "@/components/music/RecommendationEngine";
 import type { User } from "@supabase/supabase-js";
 
 interface ActivityType {
@@ -175,6 +176,11 @@ const Dashboard = () => {
         {/* Biometric Monitor */}
         <section className="mb-8">
           <BiometricMonitor />
+        </section>
+
+        {/* Smart Recommendations */}
+        <section className="mb-8">
+          <RecommendationEngine />
         </section>
 
         {/* Music Player Section */}
