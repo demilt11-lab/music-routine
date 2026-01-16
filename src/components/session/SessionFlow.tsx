@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { 
   Play, Square, Music, Activity, Clock, Heart, Brain,
   ChevronRight, Check, Smile, Meh, Frown, Loader2,
-  Moon, Dumbbell, BookOpen, Coffee, Car, Sparkles, Volume2
+  Moon, Dumbbell, BookOpen, Coffee, Car, Sparkles, Volume2, BarChart3
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useBiometricTracking } from "@/hooks/useBiometricTracking";
 import { useAutoPlayQueue } from "@/hooks/useAutoPlayQueue";
@@ -18,6 +19,8 @@ import { useAdaptiveMusic } from "@/hooks/useAdaptiveMusic";
 import { DeviceConnector } from "./DeviceConnector";
 import { EEGConnector } from "./EEGConnector";
 import { AdaptiveMusicPanel } from "./AdaptiveMusicPanel";
+import { SessionSummaryReport } from "./SessionSummaryReport";
+import { PredictiveQueueBuilder } from "./PredictiveQueueBuilder";
 import { MusicPlayer } from "@/components/music/MusicPlayer";
 import { EEGReading } from "@/hooks/useMuseEEG";
 import { toast } from "sonner";
@@ -63,6 +66,25 @@ export function SessionFlow() {
   const [isEEGConnected, setIsEEGConnected] = useState(false);
   const [eegMetrics, setEEGMetrics] = useState<{ focus: number; relaxation: number; meditation: number } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [showSummaryReport, setShowSummaryReport] = useState(false);
+
+  // Session tracking for summary report
+  const [biometricHistory, setBiometricHistory] = useState<Array<{
+    timestamp: Date;
+    heartRate: number;
+    focusScore: number;
+    relaxationScore: number;
+    stressLevel: number;
+  }>>([]);
+  const [musicAdaptations, setMusicAdaptations] = useState<Array<{
+    timestamp: Date;
+    trackName: string;
+    artist: string;
+    tempo: number;
+    energy: number;
+    reason: string;
+    triggerType: 'biometric' | 'goal' | 'manual' | 'auto';
+  }>>([]);
 
   const { state: biometricState, startTracking, stopTracking, addReading, saveReadingsToSession } = useBiometricTracking();
   
@@ -256,7 +278,7 @@ export function SessionFlow() {
     const relaxation = Math.max(0, Math.min(100, 100 - baseStress + Math.random() * 10));
     const focus = Math.max(0, Math.min(100, 50 + (80 - heartRate) * 0.5 + Math.random() * 15));
 
-    addReading({
+    const reading = {
       heartRate,
       heartRateVariability: Math.round(50 - (heartRate - 70) * 0.3 + Math.random() * 10),
       stressLevel: Math.round(baseStress),
@@ -264,7 +286,18 @@ export function SessionFlow() {
       focusScore: Math.round(focus),
       deviceType: "bluetooth_hr",
       recordedAt: new Date(),
-    });
+    };
+
+    addReading(reading);
+
+    // Track for session summary
+    setBiometricHistory(prev => [...prev, {
+      timestamp: new Date(),
+      heartRate,
+      focusScore: Math.round(focus),
+      relaxationScore: Math.round(relaxation),
+      stressLevel: Math.round(baseStress),
+    }]);
   }, [addReading]);
 
   const handleEEGUpdate = useCallback((reading: EEGReading, metrics: { focus: number; relaxation: number; meditation: number }) => {
@@ -282,10 +315,36 @@ export function SessionFlow() {
       deviceType: "muse_eeg",
       recordedAt: new Date(),
     });
-  }, [addReading]);
+
+    // Track for session summary
+    setBiometricHistory(prev => [...prev, {
+      timestamp: new Date(),
+      heartRate: biometricState.currentReading?.heartRate || 70,
+      focusScore: metrics.focus,
+      relaxationScore: metrics.relaxation,
+      stressLevel: biometricState.currentReading?.stressLevel || 30,
+    }]);
+  }, [addReading, biometricState.currentReading]);
+
+  // Track music adaptations when recommendations change
+  useEffect(() => {
+    const recommendation = adaptiveMusic.state.currentRecommendation;
+    if (recommendation && jamendo.currentTrack && step === "active") {
+      setMusicAdaptations(prev => [...prev, {
+        timestamp: new Date(),
+        trackName: jamendo.currentTrack?.name || "Unknown",
+        artist: jamendo.currentTrack?.artist_name || "Unknown",
+        tempo: recommendation.targetTempo,
+        energy: recommendation.targetEnergy,
+        reason: recommendation.reasoning,
+        triggerType: 'biometric' as const,
+      }]);
+    }
+  }, [adaptiveMusic.state.currentRecommendation?.reasoning]);
 
   const handleEndSession = () => {
     stopTracking();
+    setShowSummaryReport(true);
     setStep("rate-mood");
   };
 
@@ -335,6 +394,9 @@ export function SessionFlow() {
     setMoodBefore(null);
     setMoodAfter(null);
     setNotes("");
+    setBiometricHistory([]);
+    setMusicAdaptations([]);
+    setShowSummaryReport(false);
   };
 
   const flowStateColors = {
@@ -652,6 +714,26 @@ export function SessionFlow() {
               />
             )}
 
+            {/* Predictive Queue Builder */}
+            {selectedActivity && biometricState.isTracking && (
+              <PredictiveQueueBuilder
+                activityType={selectedActivity.name}
+                currentBiometrics={{
+                  focus: biometricState.currentReading?.focusScore || 50,
+                  relaxation: biometricState.currentReading?.relaxationScore || 50,
+                  stress: biometricState.currentReading?.stressLevel || 30,
+                  heartRate: biometricState.currentReading?.heartRate || 70,
+                }}
+                goalFlowScore={70}
+                isSessionActive={step === "active"}
+                onQueueReady={(tracks) => {
+                  tracks.forEach(track => {
+                    autoPlayQueue.addToQueue([track]);
+                  });
+                }}
+              />
+            )}
+
             {/* Hidden audio element for Jamendo playback */}
             <audio ref={jamendo.audioRef} className="hidden" />
 
@@ -677,11 +759,37 @@ export function SessionFlow() {
         {/* Step 4: Rate Mood After */}
         {step === "rate-mood" && (
           <div className="space-y-6">
+            {/* Session Summary Report Dialog */}
+            {showSummaryReport && biometricHistory.length > 0 && (
+              <Dialog open={showSummaryReport} onOpenChange={setShowSummaryReport}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <SessionSummaryReport
+                    sessionDuration={elapsedTime}
+                    activityName={selectedActivity?.name || "Session"}
+                    moodBefore={moodBefore || "neutral"}
+                    moodAfter={moodAfter || "neutral"}
+                    biometricHistory={biometricHistory}
+                    musicAdaptations={musicAdaptations}
+                    onClose={() => setShowSummaryReport(false)}
+                  />
+                </DialogContent>
+              </Dialog>
+            )}
+
             <div className="text-center">
               <h3 className="text-xl font-bold mb-2">Session Complete!</h3>
               <p className="text-muted-foreground">
                 {formatTime(elapsedTime)} • {biometricState.readings.length} readings
               </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => setShowSummaryReport(true)}
+              >
+                <BarChart3 className="w-4 h-4 mr-2" />
+                View Summary Report
+              </Button>
             </div>
 
             <div>
