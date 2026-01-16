@@ -12,11 +12,12 @@ import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { AdaptiveTimeline } from "@/components/session/AdaptiveTimeline";
 import { 
   Sparkles, Play, Pause, Music2, Zap, Target, RefreshCw,
   Moon, Dumbbell, BookOpen, Coffee, Car, Heart, Brain,
   TrendingUp, Plus, ListMusic, Activity, Gauge, Timer,
-  ArrowUp, ArrowDown, Minus, AlertCircle, CheckCircle2
+  ArrowUp, ArrowDown, Minus, AlertCircle, CheckCircle2, Clock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -53,6 +54,31 @@ interface BiometricAdjustment {
   energyModifier: number;
   reason: string;
   urgency: "low" | "medium" | "high";
+}
+
+// Timeline tracking types
+interface BiometricSnapshot {
+  timestamp: Date;
+  heartRate: number;
+  focusScore: number;
+  relaxationScore: number;
+  stressLevel: number;
+}
+
+interface MusicAdaptation {
+  timestamp: Date;
+  trackName: string;
+  artist: string;
+  tempo: number;
+  energy: number;
+  reason: string;
+  triggerType: 'biometric' | 'goal' | 'manual' | 'auto';
+  biometricTrigger?: {
+    metric: string;
+    previousValue: number;
+    currentValue: number;
+    direction: 'up' | 'down' | 'stable';
+  };
 }
 
 const activityIcons: Record<string, React.ReactNode> = {
@@ -147,6 +173,12 @@ export function RecommendationEngine() {
     isActive: false,
     currentProgress: 0,
   });
+  
+  // Timeline tracking
+  const [biometricHistory, setBiometricHistory] = useState<BiometricSnapshot[]>([]);
+  const [musicAdaptations, setMusicAdaptations] = useState<MusicAdaptation[]>([]);
+  const [showTimeline, setShowTimeline] = useState(false);
+  const previousBiometricRef = useRef<BiometricReading | null>(null);
   
   const jamendo = useJamendo();
   const biometricTracking = useBiometricTracking();
@@ -382,6 +414,54 @@ export function RecommendationEngine() {
       
       setRecommendations(scoredTracks);
       
+      // Track music adaptation for timeline
+      if (scoredTracks.length > 0 && isRealTimeEnabled) {
+        const topTrack = scoredTracks[0];
+        const currentReading = biometricTracking.state.currentReading;
+        const previousReading = previousBiometricRef.current;
+        
+        let triggerType: 'biometric' | 'goal' | 'manual' | 'auto' = 'auto';
+        let biometricTrigger: MusicAdaptation['biometricTrigger'] | undefined;
+        
+        if (adjustment && (adjustment.tempoModifier !== 0 || adjustment.energyModifier !== 0)) {
+          triggerType = flowGoal.isActive ? 'goal' : 'biometric';
+          
+          if (currentReading && previousReading) {
+            const focusDiff = currentReading.focusScore - previousReading.focusScore;
+            const stressDiff = currentReading.stressLevel - previousReading.stressLevel;
+            
+            if (Math.abs(stressDiff) > Math.abs(focusDiff)) {
+              biometricTrigger = {
+                metric: 'Stress',
+                previousValue: Math.round(previousReading.stressLevel),
+                currentValue: Math.round(currentReading.stressLevel),
+                direction: stressDiff > 5 ? 'up' : stressDiff < -5 ? 'down' : 'stable'
+              };
+            } else {
+              biometricTrigger = {
+                metric: 'Focus',
+                previousValue: Math.round(previousReading.focusScore),
+                currentValue: Math.round(currentReading.focusScore),
+                direction: focusDiff > 5 ? 'up' : focusDiff < -5 ? 'down' : 'stable'
+              };
+            }
+          }
+        }
+        
+        const adaptation: MusicAdaptation = {
+          timestamp: new Date(),
+          trackName: topTrack.name,
+          artist: topTrack.artist_name,
+          tempo: adjustedTempo,
+          energy: adjustedEnergy,
+          reason: adjustment?.reason || 'Periodic refresh based on activity profile',
+          triggerType,
+          biometricTrigger,
+        };
+        
+        setMusicAdaptations(prev => [...prev, adaptation]);
+      }
+      
       if (adjustment && isRealTimeEnabled) {
         toast.success(`Recommendations adjusted based on biometrics`, { duration: 2000 });
       } else {
@@ -395,7 +475,7 @@ export function RecommendationEngine() {
     }
   }, [profiles, selectedActivity, jamendo, isRealTimeEnabled, flowGoal, biometricTracking.state.currentReading]);
 
-  // Real-time biometric monitoring
+  // Real-time biometric monitoring with timeline tracking
   useEffect(() => {
     if (isRealTimeEnabled && selectedActivity) {
       const profile = profiles.find(p => p.activityId === selectedActivity);
@@ -409,6 +489,16 @@ export function RecommendationEngine() {
       realTimeInterval.current = setInterval(() => {
         const currentReading = biometricTracking.state.currentReading;
         if (currentReading && profile) {
+          // Track biometric snapshot for timeline
+          const snapshot: BiometricSnapshot = {
+            timestamp: new Date(),
+            heartRate: currentReading.heartRate,
+            focusScore: currentReading.focusScore,
+            relaxationScore: currentReading.relaxationScore,
+            stressLevel: currentReading.stressLevel,
+          };
+          setBiometricHistory(prev => [...prev.slice(-120), snapshot]); // Keep last 120 readings (10 min at 5s interval)
+          
           const adjustment = calculateBiometricAdjustment(
             currentReading,
             flowGoal.isActive ? flowGoal.targetScore : profile.avgFlowScore,
@@ -422,6 +512,9 @@ export function RecommendationEngine() {
             const currentFlow = (currentReading.focusScore + currentReading.relaxationScore) / 2;
             setFlowGoal(prev => ({ ...prev, currentProgress: currentFlow }));
           }
+          
+          // Store previous reading for comparison
+          previousBiometricRef.current = currentReading;
           
           // Auto-refresh recommendations if significant change detected
           if (adjustment.urgency === "high" || adjustment.urgency === "medium") {
@@ -467,10 +560,17 @@ export function RecommendationEngine() {
   const toggleRealTime = () => {
     setIsRealTimeEnabled(!isRealTimeEnabled);
     if (!isRealTimeEnabled) {
+      // Clear timeline data when starting new session
+      setBiometricHistory([]);
+      setMusicAdaptations([]);
       toast.success("Real-time biometric mode enabled");
     } else {
       toast.info("Real-time mode disabled");
     }
+  };
+
+  const toggleTimeline = () => {
+    setShowTimeline(!showTimeline);
   };
 
   const toggleFlowGoal = () => {
@@ -543,7 +643,22 @@ export function RecommendationEngine() {
               AI-powered music suggestions optimized for your flow state
             </CardDescription>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            {isRealTimeEnabled && (
+              <Button 
+                variant={showTimeline ? "default" : "outline"}
+                size="sm" 
+                onClick={toggleTimeline}
+              >
+                <Clock className="w-4 h-4 mr-2" />
+                Timeline
+                {musicAdaptations.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 text-xs">
+                    {musicAdaptations.length}
+                  </Badge>
+                )}
+              </Button>
+            )}
             <Button 
               variant="outline" 
               size="sm" 
@@ -557,6 +672,15 @@ export function RecommendationEngine() {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Adaptive Timeline */}
+        {showTimeline && isRealTimeEnabled && (
+          <AdaptiveTimeline
+            biometricHistory={biometricHistory}
+            musicAdaptations={musicAdaptations}
+            isLive={isRealTimeEnabled}
+          />
+        )}
+
         {/* Real-Time & Goal Settings */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Real-Time Biometric Mode */}
