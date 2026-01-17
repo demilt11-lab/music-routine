@@ -16,6 +16,7 @@ import { useBiometricTracking } from "@/hooks/useBiometricTracking";
 import { useAutoPlayQueue } from "@/hooks/useAutoPlayQueue";
 import { useJamendo, JamendoTrack } from "@/hooks/useJamendo";
 import { useAdaptiveMusic } from "@/hooks/useAdaptiveMusic";
+import { useFlowNotifications } from "@/hooks/useFlowNotifications";
 import { DeviceConnector } from "./DeviceConnector";
 import { EEGConnector } from "./EEGConnector";
 import { AdaptiveMusicPanel } from "./AdaptiveMusicPanel";
@@ -97,6 +98,16 @@ export function SessionFlow() {
   // Adaptive music recommendations
   const adaptiveMusic = useAdaptiveMusic(selectedActivity?.name || "study");
   
+  // Flow notifications for session milestones
+  const flowNotifications = useFlowNotifications({
+    audioEnabled: true,
+    hapticEnabled: true,
+    toastEnabled: true,
+  });
+  
+  // Session milestone tracking
+  const sessionMilestoneRef = useRef<number>(0);
+  
   // Track last processed recommendation to avoid duplicate queue additions
   const lastRecommendationRef = useRef<string | null>(null);
 
@@ -109,16 +120,28 @@ export function SessionFlow() {
     fetchActivities();
   }, []);
 
-  // Timer for active session
+  // Timer for active session with milestone notifications
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (step === "active" && startTime) {
       interval = setInterval(() => {
-        setElapsedTime(Math.floor((Date.now() - startTime.getTime()) / 1000));
+        const elapsed = Math.floor((Date.now() - startTime.getTime()) / 1000);
+        setElapsedTime(elapsed);
+        
+        // Check for session time milestones (every 15 minutes)
+        const currentMilestone = Math.floor(elapsed / 900); // 900 seconds = 15 minutes
+        if (currentMilestone > sessionMilestoneRef.current && currentMilestone > 0) {
+          sessionMilestoneRef.current = currentMilestone;
+          const minutes = currentMilestone * 15;
+          flowNotifications.notifySessionMilestone(
+            `${minutes} Minutes Complete!`,
+            `Great job staying focused for ${minutes} minutes${selectedActivity ? ` on ${selectedActivity.name}` : ""}`
+          );
+        }
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [step, startTime]);
+  }, [step, startTime, selectedActivity, flowNotifications]);
 
   // Auto-play: Handle track ending and queue next song
   useEffect(() => {
