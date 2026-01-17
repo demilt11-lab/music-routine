@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useJamendo, JamendoTrack } from "@/hooks/useJamendo";
 import { useBiometricTracking, BiometricReading } from "@/hooks/useBiometricTracking";
+import { useFlowNotifications } from "@/hooks/useFlowNotifications";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +18,8 @@ import {
   Sparkles, Play, Pause, Music2, Zap, Target, RefreshCw,
   Moon, Dumbbell, BookOpen, Coffee, Car, Heart, Brain,
   TrendingUp, Plus, ListMusic, Activity, Gauge, Timer,
-  ArrowUp, ArrowDown, Minus, AlertCircle, CheckCircle2, Clock
+  ArrowUp, ArrowDown, Minus, AlertCircle, CheckCircle2, Clock,
+  Bell, BellOff
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -179,9 +181,19 @@ export function RecommendationEngine() {
   const [musicAdaptations, setMusicAdaptations] = useState<MusicAdaptation[]>([]);
   const [showTimeline, setShowTimeline] = useState(false);
   const previousBiometricRef = useRef<BiometricReading | null>(null);
+  const goalAchievedRef = useRef(false);
+  const peakFlowStartRef = useRef<Date | null>(null);
+  
+  // Notification settings
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   
   const jamendo = useJamendo();
   const biometricTracking = useBiometricTracking();
+  const flowNotifications = useFlowNotifications({
+    audioEnabled: notificationsEnabled,
+    hapticEnabled: notificationsEnabled,
+    toastEnabled: notificationsEnabled,
+  });
 
   // Calculate activity profiles from historical data
   const loadActivityProfiles = useCallback(async () => {
@@ -475,7 +487,7 @@ export function RecommendationEngine() {
     }
   }, [profiles, selectedActivity, jamendo, isRealTimeEnabled, flowGoal, biometricTracking.state.currentReading]);
 
-  // Real-time biometric monitoring with timeline tracking
+  // Real-time biometric monitoring with timeline tracking and notifications
   useEffect(() => {
     if (isRealTimeEnabled && selectedActivity) {
       const profile = profiles.find(p => p.activityId === selectedActivity);
@@ -507,10 +519,45 @@ export function RecommendationEngine() {
           
           setBiometricAdjustment(adjustment);
           
-          // Update flow goal progress
+          // Calculate current flow score
+          const currentFlow = (currentReading.focusScore + currentReading.relaxationScore) / 2;
+          
+          // Update flow goal progress and check for goal achievement
           if (flowGoal.isActive) {
-            const currentFlow = (currentReading.focusScore + currentReading.relaxationScore) / 2;
             setFlowGoal(prev => ({ ...prev, currentProgress: currentFlow }));
+            
+            // Check if goal was just achieved
+            if (currentFlow >= flowGoal.targetScore && !goalAchievedRef.current) {
+              goalAchievedRef.current = true;
+              flowNotifications.notifyGoalAchieved(flowGoal.targetScore, currentFlow);
+            } else if (currentFlow < flowGoal.targetScore) {
+              goalAchievedRef.current = false;
+              
+              // Notify progress milestones
+              const progress = (currentFlow / flowGoal.targetScore) * 100;
+              const remaining = flowGoal.targetScore - currentFlow;
+              flowNotifications.notifyGoalProgress(progress, remaining);
+            }
+          }
+          
+          // Track peak flow state duration
+          if (currentFlow >= 75) {
+            if (!peakFlowStartRef.current) {
+              peakFlowStartRef.current = new Date();
+            } else {
+              const duration = (Date.now() - peakFlowStartRef.current.getTime()) / 1000;
+              // Notify at 5+ minute milestones
+              if (duration >= 300 && duration % 300 < 5) {
+                flowNotifications.notifyFlowPeak(currentFlow, duration);
+              }
+            }
+          } else {
+            peakFlowStartRef.current = null;
+          }
+          
+          // Stress alert
+          if (currentReading.stressLevel > 70) {
+            flowNotifications.notifyStressAlert(currentReading.stressLevel);
           }
           
           // Store previous reading for comparison
@@ -518,6 +565,11 @@ export function RecommendationEngine() {
           
           // Auto-refresh recommendations if significant change detected
           if (adjustment.urgency === "high" || adjustment.urgency === "medium") {
+            // Notify about music adaptation
+            flowNotifications.notifyMusicAdaptation(adjustment.reason, {
+              tempo: adjustment.tempoModifier,
+              energy: adjustment.energyModifier,
+            });
             generateRecommendations(adjustment);
           }
         }
@@ -533,8 +585,10 @@ export function RecommendationEngine() {
         clearInterval(realTimeInterval.current);
       }
       setBiometricAdjustment(null);
+      goalAchievedRef.current = false;
+      peakFlowStartRef.current = null;
     }
-  }, [isRealTimeEnabled, selectedActivity, profiles, flowGoal.isActive, flowGoal.targetScore]);
+  }, [isRealTimeEnabled, selectedActivity, profiles, flowGoal.isActive, flowGoal.targetScore, flowNotifications]);
 
   // Load profiles on mount
   useEffect(() => {
@@ -699,6 +753,24 @@ export function RecommendationEngine() {
             <p className="text-xs text-muted-foreground">
               Automatically adjusts recommendations based on live biometric data
             </p>
+            
+            {isRealTimeEnabled && (
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div className="flex items-center gap-2">
+                  {notificationsEnabled ? (
+                    <Bell className="w-4 h-4 text-primary" />
+                  ) : (
+                    <BellOff className="w-4 h-4 text-muted-foreground" />
+                  )}
+                  <Label htmlFor="notifications" className="text-sm">Audio & Haptic Alerts</Label>
+                </div>
+                <Switch
+                  id="notifications"
+                  checked={notificationsEnabled}
+                  onCheckedChange={setNotificationsEnabled}
+                />
+              </div>
+            )}
             
             {isRealTimeEnabled && currentReading && (
               <div className="space-y-2 pt-2 border-t">
