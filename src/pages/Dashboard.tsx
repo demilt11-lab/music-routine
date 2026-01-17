@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { 
   Music, LogOut, Moon, Dumbbell, BookOpen, Coffee, Car, 
-  Sparkles, Loader2, Play, Clock, ListMusic, Headphones, Heart
+  Sparkles, Loader2, Play, Clock, ListMusic, Headphones, BarChart3, History
 } from "lucide-react";
 import { MusicTabs } from "@/components/music/MusicTabs";
 import { BiometricMonitor } from "@/components/biometrics/BiometricMonitor";
@@ -150,6 +150,14 @@ const Dashboard = () => {
             <span className="font-semibold text-lg">MindTune</span>
           </div>
           <div className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" onClick={() => navigate("/insights")}>
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Weekly Insights
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/history")}>
+              <History className="w-4 h-4 mr-2" />
+              History
+            </Button>
             <span className="text-sm text-muted-foreground">{user?.email}</span>
             <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="w-4 h-4 mr-2" />
