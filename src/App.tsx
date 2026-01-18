@@ -8,6 +8,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import SessionHistory from "./pages/SessionHistory";
 import WeeklyInsights from "./pages/WeeklyInsights";
+import MonthlyProgress from "./pages/MonthlyProgress";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -23,6 +24,7 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/history" element={<SessionHistory />} />
           <Route path="/insights" element={<WeeklyInsights />} />
+          <Route path="/monthly" element={<MonthlyProgress />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
