@@ -15,6 +15,7 @@ import { BiometricCharts } from "@/components/biometrics/BiometricCharts";
 import { PersonalizedInsights } from "@/components/biometrics/PersonalizedInsights";
 import { SessionFlow } from "@/components/session/SessionFlow";
 import { RecommendationEngine } from "@/components/music/RecommendationEngine";
+import { SmartScheduler } from "@/components/scheduling/SmartScheduler";
 import type { User } from "@supabase/supabase-js";
 
 interface ActivityType {
@@ -193,6 +194,11 @@ const Dashboard = () => {
         {/* Smart Recommendations */}
         <section className="mb-8">
           <RecommendationEngine />
+        </section>
+
+        {/* Smart Scheduling */}
+        <section className="mb-8">
+          <SmartScheduler />
         </section>
 
         {/* Music Player Section */}
