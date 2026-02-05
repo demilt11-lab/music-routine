@@ -1,5 +1,6 @@
 import { useCallback, useRef, useEffect } from "react";
 import { toast } from "sonner";
+import { useNativeHaptics } from "./useNativeHaptics";
 
 type NotificationType = 
   | "goal_achieved" 
@@ -25,20 +26,21 @@ const NOTIFICATION_SOUNDS: Record<NotificationType, { frequency: number; duratio
   session_milestone: { frequency: 523, duration: 250, type: "sine", pattern: [150, 50, 150] },
 };
 
-// Haptic patterns (vibration duration arrays in ms)
-const HAPTIC_PATTERNS: Record<NotificationType, number[]> = {
-  goal_achieved: [100, 50, 100, 50, 200],
-  goal_progress: [50, 30, 50],
-  music_adaptation: [30],
-  flow_peak: [100, 50, 100, 50, 100, 50, 200],
-  stress_alert: [200, 100, 200],
-  session_milestone: [100, 50, 150],
+// Map notification types to native haptic types
+const HAPTIC_TYPE_MAP: Record<NotificationType, "success" | "warning" | "error" | "medium" | "heavy"> = {
+  goal_achieved: "success",
+  goal_progress: "medium",
+  music_adaptation: "medium",
+  flow_peak: "success",
+  stress_alert: "warning",
+  session_milestone: "success",
 };
 
 export function useFlowNotifications(config: NotificationConfig = { audioEnabled: true, hapticEnabled: true, toastEnabled: true }) {
   const audioContextRef = useRef<AudioContext | null>(null);
   const lastNotificationRef = useRef<{ type: NotificationType; time: number } | null>(null);
   const configRef = useRef(config);
+  const { triggerHaptic, isNative } = useNativeHaptics();
 
   // Update config ref when config changes
   useEffect(() => {
@@ -69,7 +71,6 @@ export function useFlowNotifications(config: NotificationConfig = { audioEnabled
 
       pattern.forEach((duration, index) => {
         if (index % 2 === 0) {
-          // Sound on
           const oscillator = ctx.createOscillator();
           const gainNode = ctx.createGain();
 
@@ -92,18 +93,13 @@ export function useFlowNotifications(config: NotificationConfig = { audioEnabled
     }
   }, [initAudioContext]);
 
-  // Trigger haptic feedback using Vibration API
-  const triggerHaptic = useCallback((type: NotificationType) => {
+  // Trigger haptic feedback using native Capacitor or web fallback
+  const triggerNotificationHaptic = useCallback((type: NotificationType) => {
     if (!configRef.current.hapticEnabled) return;
-
-    if ("vibrate" in navigator) {
-      try {
-        navigator.vibrate(HAPTIC_PATTERNS[type]);
-      } catch (error) {
-        console.warn("Haptic feedback failed:", error);
-      }
-    }
-  }, []);
+    
+    const hapticType = HAPTIC_TYPE_MAP[type];
+    triggerHaptic(hapticType);
+  }, [triggerHaptic]);
 
   // Show toast notification
   const showToast = useCallback((type: NotificationType, message: string, description?: string) => {
@@ -157,9 +153,9 @@ export function useFlowNotifications(config: NotificationConfig = { audioEnabled
 
     // Trigger all notification types
     playAudio(type);
-    triggerHaptic(type);
+    triggerNotificationHaptic(type);
     showToast(type, message, description);
-  }, [playAudio, triggerHaptic, showToast]);
+  }, [playAudio, triggerNotificationHaptic, showToast]);
 
   // Specific notification helpers
   const notifyGoalAchieved = useCallback((goalScore: number, currentScore: number) => {

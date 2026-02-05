@@ -10,6 +10,8 @@ import SessionHistory from "./pages/SessionHistory";
 import WeeklyInsights from "./pages/WeeklyInsights";
 import MonthlyProgress from "./pages/MonthlyProgress";
 import NotFound from "./pages/NotFound";
+import { MobileNavBar } from "./components/mobile/MobileNavBar";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -18,15 +20,18 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/history" element={<SessionHistory />} />
-          <Route path="/insights" element={<WeeklyInsights />} />
-          <Route path="/monthly" element={<MonthlyProgress />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <div className="min-h-screen pb-16 md:pb-0">
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/history" element={<SessionHistory />} />
+            <Route path="/insights" element={<WeeklyInsights />} />
+            <Route path="/monthly" element={<MonthlyProgress />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+          <MobileNavBar />
+        </div>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
