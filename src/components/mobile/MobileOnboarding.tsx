@@ -109,7 +109,7 @@ export function MobileOnboarding({ onComplete }: MobileOnboardingProps) {
 
   return (
     <div 
-      className="fixed inset-0 z-50 bg-background flex flex-col safe-area-top safe-area-bottom"
+      className="fixed inset-0 z-[100] bg-background flex flex-col safe-area-top safe-area-bottom"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
