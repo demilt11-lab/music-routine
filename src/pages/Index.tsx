@@ -5,7 +5,10 @@ import Features from "@/components/Features";
 import Footer from "@/components/Footer";
 import AuthModal from "@/components/AuthModal";
 import Dashboard from "@/components/Dashboard";
+import { MobileOnboarding } from "@/components/mobile/MobileOnboarding";
 import { useToast } from "@/hooks/use-toast";
+import { useOnboarding } from "@/hooks/useOnboarding";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -13,6 +16,8 @@ const Index = () => {
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [isSpotifyConnected, setIsSpotifyConnected] = useState(false);
   const { toast } = useToast();
+  const { showOnboarding, isLoading, completeOnboarding } = useOnboarding();
+  const isMobile = useIsMobile();
 
   const handleLogin = () => {
     setAuthMode("login");
@@ -56,6 +61,11 @@ const Index = () => {
       }, 1500);
     }
   };
+
+  // Show onboarding for first-time mobile users
+  if (isMobile && showOnboarding && !isLoading) {
+    return <MobileOnboarding onComplete={completeOnboarding} />;
+  }
 
   if (isAuthenticated) {
     return (
