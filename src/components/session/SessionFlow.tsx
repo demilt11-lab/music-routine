@@ -22,6 +22,8 @@ import { EEGConnector } from "./EEGConnector";
 import { AdaptiveMusicPanel } from "./AdaptiveMusicPanel";
 import { SessionSummaryReport } from "./SessionSummaryReport";
 import { PredictiveQueueBuilder } from "./PredictiveQueueBuilder";
+import { ActivityStartingRecommendation } from "./ActivityStartingRecommendation";
+import { useActivityStartingSong } from "@/hooks/useActivityStartingSong";
 import { MusicPlayer } from "@/components/music/MusicPlayer";
 import { EEGReading } from "@/hooks/useMuseEEG";
 import { toast } from "sonner";
@@ -88,6 +90,9 @@ export function SessionFlow() {
   }>>([]);
 
   const { state: biometricState, startTracking, stopTracking, addReading, saveReadingsToSession } = useBiometricTracking();
+  
+  // Starting song recommendation based on previous session data
+  const { recommendation: startingRecommendation, isLoading: isLoadingStarting, fetchStartingSong } = useActivityStartingSong();
   
   // Auto-play queue management
   const autoPlayQueue = useAutoPlayQueue();
@@ -255,6 +260,7 @@ export function SessionFlow() {
 
   const handleActivitySelect = (activity: ActivityType) => {
     setSelectedActivity(activity);
+    fetchStartingSong(activity.id);
   };
 
   const handleMoodBeforeSelect = (mood: MoodRating) => {
@@ -512,6 +518,22 @@ export function SessionFlow() {
                   ))}
                 </div>
               </div>
+            )}
+
+            {/* Starting Song Recommendation */}
+            {selectedActivity && startingRecommendation && (
+              <ActivityStartingRecommendation
+                recommendation={startingRecommendation}
+                isLoading={isLoadingStarting}
+                activityName={selectedActivity.name}
+              />
+            )}
+            {selectedActivity && isLoadingStarting && !startingRecommendation && (
+              <ActivityStartingRecommendation
+                recommendation={{ optimalTempo: 0, optimalEnergy: 0, topSongs: [], lastSessionSummary: null, hasHistory: false }}
+                isLoading={true}
+                activityName={selectedActivity.name}
+              />
             )}
 
             <Button
