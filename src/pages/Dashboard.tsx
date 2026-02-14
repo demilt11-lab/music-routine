@@ -45,6 +45,7 @@ const activityIcons: Record<string, React.ReactNode> = {
 
 const Dashboard = () => {
   const [user, setUser] = useState<User | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [playlists, setPlaylists] = useState<GeneratedPlaylist[]>([]);
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
@@ -78,17 +79,23 @@ const Dashboard = () => {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [activitiesRes, playlistsRes] = await Promise.all([
+      const [activitiesRes, playlistsRes, profileRes] = await Promise.all([
         supabase.from("activity_types").select("*"),
         supabase
           .from("generated_playlists")
           .select("*, activity_types(name)")
           .order("created_at", { ascending: false })
           .limit(5),
+        supabase
+          .from("profiles")
+          .select("display_name")
+          .eq("id", user!.id)
+          .single(),
       ]);
 
       if (activitiesRes.data) setActivityTypes(activitiesRes.data);
       if (playlistsRes.data) setPlaylists(playlistsRes.data as GeneratedPlaylist[]);
+      if (profileRes.data) setDisplayName(profileRes.data.display_name);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -179,7 +186,9 @@ const Dashboard = () => {
       <main className="container mx-auto px-4 py-8 pb-32">
         {/* Welcome Section */}
         <section className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Welcome back!</h1>
+          <h1 className="text-3xl font-bold mb-2">
+            Welcome back{displayName ? `, ${displayName}` : ""}! 👋
+          </h1>
           <p className="text-muted-foreground">
             Play music from multiple sources - no API keys required!
           </p>
