@@ -1,48 +1,83 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Music2, Eye, EyeOff, Loader2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   mode: "login" | "register";
   onToggleMode: () => void;
-  onSuccess: (token: string) => void;
 }
 
-const AuthModal = ({ isOpen, onClose, mode, onToggleMode, onSuccess }: AuthModalProps) => {
-  const [username, setUsername] = useState("");
+const AuthModal = ({ isOpen, onClose, mode, onToggleMode }: AuthModalProps) => {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!email || !email.includes("@")) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+    if (password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
     setIsLoading(true);
 
-    // Simulate API call - in production, connect to your FastAPI backend
-    setTimeout(() => {
-      setIsLoading(false);
-      if (username && password) {
-        // Mock success - replace with actual API call
-        const mockToken = "mock-jwt-token-" + Date.now();
-        toast({
-          title: mode === "login" ? "Welcome back!" : "Account created!",
-          description: mode === "login" 
-            ? "You've successfully signed in." 
-            : "Your account has been created successfully.",
+    try {
+      if (mode === "register") {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/dashboard`,
+          },
         });
-        onSuccess(mockToken);
-        onClose();
-        setUsername("");
-        setPassword("");
+        if (error) {
+          if (error.message.includes("already registered")) {
+            toast.error("This email is already registered. Please sign in instead.");
+          } else {
+            toast.error(error.message);
+          }
+        } else {
+          toast.success("Account created! You're now signed in.");
+          onClose();
+          navigate("/dashboard");
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) {
+          if (error.message.includes("Invalid login credentials")) {
+            toast.error("Invalid email or password");
+          } else {
+            toast.error(error.message);
+          }
+        } else {
+          toast.success("Welcome back!");
+          onClose();
+          navigate("/dashboard");
+        }
       }
-    }, 1500);
+    } catch {
+      toast.error("An unexpected error occurred");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -58,33 +93,33 @@ const AuthModal = ({ isOpen, onClose, mode, onToggleMode, onSuccess }: AuthModal
             {mode === "login" ? "Welcome back" : "Create account"}
           </DialogTitle>
           <p className="text-center text-muted-foreground text-sm">
-            {mode === "login" 
-              ? "Sign in to continue to Routine Music" 
+            {mode === "login"
+              ? "Sign in to continue to Routine Music"
               : "Get started with your music journey"}
           </p>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
+            <Label htmlFor="auth-email">Email</Label>
             <Input
-              id="username"
-              type="text"
-              placeholder="Enter your username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              id="auth-email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
               className="h-12"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="auth-password">Password</Label>
             <div className="relative">
               <Input
-                id="password"
+                id="auth-password"
                 type={showPassword ? "text" : "password"}
-                placeholder="Enter your password"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -115,7 +150,7 @@ const AuthModal = ({ isOpen, onClose, mode, onToggleMode, onSuccess }: AuthModal
         <div className="mt-6 text-center">
           <p className="text-sm text-muted-foreground">
             {mode === "login" ? "Don't have an account?" : "Already have an account?"}{" "}
-            <button 
+            <button
               onClick={onToggleMode}
               className="text-primary font-semibold hover:underline"
             >
