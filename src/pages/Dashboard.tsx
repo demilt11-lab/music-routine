@@ -18,6 +18,7 @@ import { RecommendationEngine } from "@/components/music/RecommendationEngine";
 import { SmartScheduler } from "@/components/scheduling/SmartScheduler";
 import { RecentSessionWidget } from "@/components/dashboard/RecentSessionWidget";
 import { AchievementBadges } from "@/components/dashboard/AchievementBadges";
+import { WeeklyRecap } from "@/components/dashboard/WeeklyRecap";
 import type { User } from "@supabase/supabase-js";
 
 interface ActivityType {
@@ -194,6 +195,11 @@ const Dashboard = () => {
           <p className="text-muted-foreground">
             Play music from multiple sources - no API keys required!
           </p>
+        </section>
+
+        {/* Weekly Recap Notification */}
+        <section className="mb-8">
+          <WeeklyRecap />
         </section>
 
         {/* Recent Session Stats & Streak */}
