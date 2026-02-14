@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { differenceInCalendarDays, startOfWeek, endOfWeek, format } from "date-fns";
-import { Bell, X, TrendingUp, TrendingDown, Minus, Flame, Target, Music, Sparkles } from "lucide-react";
+import { Bell, X, TrendingUp, TrendingDown, Minus, Flame, Target, Music, Sparkles, Lightbulb } from "lucide-react";
 
 const WEEKLY_QUOTES = [
   { text: "Music gives a soul to the universe, wings to the mind, flight to the imagination.", author: "Plato" },
@@ -21,11 +21,35 @@ const WEEKLY_QUOTES = [
   { text: "One song can change a moment, one idea can change the world.", author: "Unknown" },
 ];
 
+const DAILY_TIPS = [
+  "Start your session with 2 minutes of silence before hitting play — it primes your brain for deeper focus.",
+  "Try matching your music tempo to your heart rate for a natural flow state.",
+  "Take a 5-minute break every 25 minutes to keep your focus sharp. Music can mark the transition.",
+  "Instrumental tracks reduce cognitive load — try going lyric-free for deep work today.",
+  "Your peak focus window is usually 2–4 hours after waking. Schedule your hardest task there.",
+  "Listening to the same playlist repeatedly builds a focus trigger — your brain learns to associate it with work.",
+  "Stay hydrated! Dehydration drops focus by up to 25%. Keep water nearby during sessions.",
+  "Vary your music by activity type — upbeat for workouts, ambient for study, calm for winding down.",
+  "End your day with a relaxation session. It helps consolidate what you learned today.",
+  "Try a new genre today — novelty can spark creativity and break mental ruts.",
+  "Set a specific intention before each session: what do you want to accomplish?",
+  "Morning sessions tend to build stronger streaks. Try shifting your routine earlier.",
+  "Use biometric tracking to discover which music actually boosts your focus, not just what feels good.",
+  "Share your achievements with a friend — accountability doubles consistency.",
+];
+
 function getWeeklyQuote(): typeof WEEKLY_QUOTES[number] {
   const now = new Date();
   const start = new Date(now.getFullYear(), 0, 1);
   const weekNumber = Math.ceil(((now.getTime() - start.getTime()) / 86400000 + start.getDay() + 1) / 7);
   return WEEKLY_QUOTES[weekNumber % WEEKLY_QUOTES.length];
+}
+
+function getDailyTip(): string {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 1);
+  const dayOfYear = Math.ceil((now.getTime() - start.getTime()) / 86400000);
+  return DAILY_TIPS[dayOfYear % DAILY_TIPS.length];
 }
 
 const RECAP_DISMISSED_KEY = "mindtune_recap_dismissed";
@@ -259,12 +283,21 @@ export const WeeklyRecap = () => {
           </div>
         )}
 
-        {/* Weekly motivational quote */}
-        <div className="mt-4 pt-3 border-t border-border flex items-start gap-2">
-          <Sparkles className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-          <div>
-            <p className="text-sm italic text-muted-foreground">"{getWeeklyQuote().text}"</p>
-            <p className="text-xs text-muted-foreground/70 mt-0.5">— {getWeeklyQuote().author}</p>
+        {/* Daily tip & Weekly quote */}
+        <div className="mt-4 pt-3 border-t border-border space-y-3">
+          <div className="flex items-start gap-2">
+            <Lightbulb className="w-4 h-4 text-accent-foreground mt-0.5 shrink-0" />
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-0.5">Today's Focus Tip</p>
+              <p className="text-sm text-foreground">{getDailyTip()}</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-2">
+            <Sparkles className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm italic text-muted-foreground">"{getWeeklyQuote().text}"</p>
+              <p className="text-xs text-muted-foreground/70 mt-0.5">— {getWeeklyQuote().author}</p>
+            </div>
           </div>
         </div>
       </CardContent>
