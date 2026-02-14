@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { differenceInCalendarDays } from "date-fns";
 import { Trophy } from "lucide-react";
+import { toast } from "sonner";
 
 interface Badge {
   id: string;
@@ -11,6 +12,8 @@ interface Badge {
   description: string;
   unlocked: boolean;
 }
+
+const STORAGE_KEY = "mindtune_unlocked_badges";
 
 function computeStreak(sessions: { started_at: string }[]): number {
   if (!sessions.length) return 0;
@@ -55,7 +58,9 @@ function buildBadges(total: number, streak: number): Badge[] {
 
 export const AchievementBadges = () => {
   const [badges, setBadges] = useState<Badge[]>([]);
+  const [newBadgeIds, setNewBadgeIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const toastsFired = useRef(false);
 
   useEffect(() => {
     fetchAchievements();
@@ -74,7 +79,34 @@ export const AchievementBadges = () => {
 
       const total = sessions?.length || 0;
       const streak = sessions ? computeStreak(sessions) : 0;
-      setBadges(buildBadges(total, streak));
+      const computed = buildBadges(total, streak);
+
+      // Detect newly unlocked badges
+      const prevUnlocked: string[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      const currentUnlocked = computed.filter((b) => b.unlocked).map((b) => b.id);
+      const freshlyUnlocked = currentUnlocked.filter((id) => !prevUnlocked.includes(id));
+
+      setNewBadgeIds(new Set(freshlyUnlocked));
+      setBadges(computed);
+
+      // Persist current state
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(currentUnlocked));
+
+      // Fire toasts for new badges (once)
+      if (!toastsFired.current && freshlyUnlocked.length > 0) {
+        toastsFired.current = true;
+        freshlyUnlocked.forEach((id, i) => {
+          const badge = computed.find((b) => b.id === id);
+          if (badge) {
+            setTimeout(() => {
+              toast.success(`${badge.emoji} Badge Unlocked: ${badge.name}!`, {
+                description: badge.description,
+                duration: 5000,
+              });
+            }, i * 800);
+          }
+        });
+      }
     } catch (err) {
       console.error("Error fetching achievements:", err);
     } finally {
@@ -106,20 +138,30 @@ export const AchievementBadges = () => {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-3">
-          {badges.map((badge) => (
-            <div
-              key={badge.id}
-              className={`flex flex-col items-center text-center p-3 rounded-xl transition-all ${
-                badge.unlocked
-                  ? "bg-primary/10 border border-primary/30"
-                  : "bg-muted/30 opacity-40 grayscale"
-              }`}
-              title={badge.description}
-            >
-              <span className="text-2xl mb-1">{badge.emoji}</span>
-              <p className="text-[10px] font-medium leading-tight">{badge.name}</p>
-            </div>
-          ))}
+          {badges.map((badge) => {
+            const isNew = newBadgeIds.has(badge.id);
+            return (
+              <div
+                key={badge.id}
+                className={`flex flex-col items-center text-center p-3 rounded-xl transition-all ${
+                  badge.unlocked
+                    ? "bg-primary/10 border border-primary/30"
+                    : "bg-muted/30 opacity-40 grayscale"
+                } ${isNew ? "animate-scale-in ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}
+                title={badge.description}
+              >
+                <span className={`text-2xl mb-1 ${isNew ? "animate-bounce" : ""}`}>
+                  {badge.emoji}
+                </span>
+                <p className="text-[10px] font-medium leading-tight">{badge.name}</p>
+                {isNew && (
+                  <span className="text-[8px] font-bold uppercase tracking-widest text-primary mt-1">
+                    New!
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       </CardContent>
     </Card>
