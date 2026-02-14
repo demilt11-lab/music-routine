@@ -1,23 +1,38 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import Features from "@/components/Features";
 import Footer from "@/components/Footer";
 import AuthModal from "@/components/AuthModal";
-import Dashboard from "@/components/Dashboard";
 import { MobileOnboarding } from "@/components/mobile/MobileOnboarding";
-import { useToast } from "@/hooks/use-toast";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
-  const [isSpotifyConnected, setIsSpotifyConnected] = useState(false);
-  const { toast } = useToast();
   const { showOnboarding, isLoading, completeOnboarding } = useOnboarding();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
+
+  // Redirect authenticated users to dashboard
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        navigate("/dashboard");
+      }
+    });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        navigate("/dashboard");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   const handleLogin = () => {
     setAuthMode("login");
@@ -29,52 +44,9 @@ const Index = () => {
     setIsAuthModalOpen(true);
   };
 
-  const handleAuthSuccess = (token: string) => {
-    setIsAuthenticated(true);
-    localStorage.setItem("token", token);
-  };
-
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setIsSpotifyConnected(false);
-    localStorage.removeItem("token");
-    toast({
-      title: "Signed out",
-      description: "You've been successfully signed out.",
-    });
-  };
-
-  const handleConnectSpotify = () => {
-    // In production, this would redirect to Spotify OAuth
-    // For now, simulate connection
-    if (!isSpotifyConnected) {
-      toast({
-        title: "Connecting to Spotify...",
-        description: "Redirecting to Spotify authorization.",
-      });
-      setTimeout(() => {
-        setIsSpotifyConnected(true);
-        toast({
-          title: "Spotify Connected!",
-          description: "Your account is now linked with Spotify.",
-        });
-      }, 1500);
-    }
-  };
-
   // Show onboarding for first-time mobile users
   if (isMobile && showOnboarding && !isLoading) {
     return <MobileOnboarding onComplete={completeOnboarding} />;
-  }
-
-  if (isAuthenticated) {
-    return (
-      <Dashboard 
-        onLogout={handleLogout} 
-        onConnectSpotify={handleConnectSpotify}
-        isSpotifyConnected={isSpotifyConnected}
-      />
-    );
   }
 
   return (
@@ -88,7 +60,6 @@ const Index = () => {
         onClose={() => setIsAuthModalOpen(false)}
         mode={authMode}
         onToggleMode={() => setAuthMode(authMode === "login" ? "register" : "login")}
-        onSuccess={handleAuthSuccess}
       />
     </div>
   );
