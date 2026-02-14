@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { 
   Music, LogOut, Moon, Dumbbell, BookOpen, Coffee, Car, 
-  Sparkles, Loader2, Play, Clock, ListMusic, Headphones, BarChart3, History, Calendar
+  Sparkles, Loader2, Play, Clock, ListMusic, Headphones, BarChart3, History, Calendar, Settings
 } from "lucide-react";
 import { MusicTabs } from "@/components/music/MusicTabs";
 import { BiometricMonitor } from "@/components/biometrics/BiometricMonitor";
@@ -162,6 +162,10 @@ const Dashboard = () => {
             <Button variant="ghost" size="sm" onClick={() => navigate("/history")}>
               <History className="w-4 h-4 mr-2" />
               History
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/settings")}>
+              <Settings className="w-4 h-4 mr-2" />
+              Settings
             </Button>
             <span className="text-sm text-muted-foreground">{user?.email}</span>
             <Button variant="ghost" size="sm" onClick={handleLogout}>
