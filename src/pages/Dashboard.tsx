@@ -17,6 +17,7 @@ import { SessionFlow } from "@/components/session/SessionFlow";
 import { RecommendationEngine } from "@/components/music/RecommendationEngine";
 import { SmartScheduler } from "@/components/scheduling/SmartScheduler";
 import { RecentSessionWidget } from "@/components/dashboard/RecentSessionWidget";
+import { AchievementBadges } from "@/components/dashboard/AchievementBadges";
 import type { User } from "@supabase/supabase-js";
 
 interface ActivityType {
@@ -198,6 +199,11 @@ const Dashboard = () => {
         {/* Recent Session Stats & Streak */}
         <section className="mb-8">
           <RecentSessionWidget />
+        </section>
+
+        {/* Achievement Badges */}
+        <section className="mb-8">
+          <AchievementBadges />
         </section>
 
         {/* Session Flow - Dedicated Listening Session */}
