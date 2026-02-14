@@ -4,7 +4,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { differenceInCalendarDays, startOfWeek, endOfWeek, format } from "date-fns";
-import { Bell, X, TrendingUp, TrendingDown, Minus, Flame, Target, Music } from "lucide-react";
+import { Bell, X, TrendingUp, TrendingDown, Minus, Flame, Target, Music, Sparkles } from "lucide-react";
+
+const WEEKLY_QUOTES = [
+  { text: "Music gives a soul to the universe, wings to the mind, flight to the imagination.", author: "Plato" },
+  { text: "Where words fail, music speaks.", author: "Hans Christian Andersen" },
+  { text: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
+  { text: "Focus is a matter of deciding what things you're not going to do.", author: "John Carmack" },
+  { text: "Consistency is what transforms average into excellence.", author: "Unknown" },
+  { text: "Every expert was once a beginner. Keep showing up.", author: "Unknown" },
+  { text: "Music can change the world because it can change people.", author: "Bono" },
+  { text: "Small daily improvements are the key to staggering long-term results.", author: "Unknown" },
+  { text: "Without music, life would be a mistake.", author: "Friedrich Nietzsche" },
+  { text: "Your focus determines your reality.", author: "Qui-Gon Jinn" },
+  { text: "The secret of getting ahead is getting started.", author: "Mark Twain" },
+  { text: "One song can change a moment, one idea can change the world.", author: "Unknown" },
+];
+
+function getWeeklyQuote(): typeof WEEKLY_QUOTES[number] {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 1);
+  const weekNumber = Math.ceil(((now.getTime() - start.getTime()) / 86400000 + start.getDay() + 1) / 7);
+  return WEEKLY_QUOTES[weekNumber % WEEKLY_QUOTES.length];
+}
 
 const RECAP_DISMISSED_KEY = "mindtune_recap_dismissed";
 
@@ -236,6 +258,15 @@ export const WeeklyRecap = () => {
             </div>
           </div>
         )}
+
+        {/* Weekly motivational quote */}
+        <div className="mt-4 pt-3 border-t border-border flex items-start gap-2">
+          <Sparkles className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm italic text-muted-foreground">"{getWeeklyQuote().text}"</p>
+            <p className="text-xs text-muted-foreground/70 mt-0.5">— {getWeeklyQuote().author}</p>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
