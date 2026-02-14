@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import SessionHistory from "./pages/SessionHistory";
 import WeeklyInsights from "./pages/WeeklyInsights";
 import MonthlyProgress from "./pages/MonthlyProgress";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import { MobileNavBar } from "./components/mobile/MobileNavBar";
 
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/history" element={<SessionHistory />} />
             <Route path="/insights" element={<WeeklyInsights />} />
             <Route path="/monthly" element={<MonthlyProgress />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <MobileNavBar />
