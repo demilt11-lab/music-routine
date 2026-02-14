@@ -432,7 +432,7 @@ export default function SessionHistory() {
                 <p className="text-3xl font-bold text-green-500">{moodImprovement.improved}</p>
                 <p className="text-sm text-muted-foreground">Improved</p>
                 <Progress 
-                  value={(moodImprovement.improved / sessions.length) * 100} 
+                  value={sessions.length > 0 ? (moodImprovement.improved / sessions.length) * 100 : 0} 
                   className="mt-2 h-2"
                 />
               </div>
@@ -440,7 +440,7 @@ export default function SessionHistory() {
                 <p className="text-3xl font-bold text-yellow-500">{moodImprovement.same}</p>
                 <p className="text-sm text-muted-foreground">Unchanged</p>
                 <Progress 
-                  value={(moodImprovement.same / sessions.length) * 100} 
+                  value={sessions.length > 0 ? (moodImprovement.same / sessions.length) * 100 : 0} 
                   className="mt-2 h-2"
                 />
               </div>
@@ -448,7 +448,7 @@ export default function SessionHistory() {
                 <p className="text-3xl font-bold text-red-500">{moodImprovement.declined}</p>
                 <p className="text-sm text-muted-foreground">Declined</p>
                 <Progress 
-                  value={(moodImprovement.declined / sessions.length) * 100} 
+                  value={sessions.length > 0 ? (moodImprovement.declined / sessions.length) * 100 : 0} 
                   className="mt-2 h-2"
                 />
               </div>

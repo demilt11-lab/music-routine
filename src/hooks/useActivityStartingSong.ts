@@ -68,7 +68,7 @@ export function useActivityStartingSong(): UseActivityStartingSongReturn {
           .from("activity_types")
           .select("name")
           .eq("id", activityTypeId)
-          .single();
+          .maybeSingle();
 
         const defaults = activityDefaults[activityType?.name || "study"] || activityDefaults.study;
 
@@ -137,7 +137,7 @@ export function useActivityStartingSong(): UseActivityStartingSongReturn {
         .from("activity_types")
         .select("name")
         .eq("id", activityTypeId)
-        .single();
+        .maybeSingle();
       const defaults = activityDefaults[activityType?.name || "study"] || activityDefaults.study;
 
       const optimalTempo = songsWithTempo.length > 0
