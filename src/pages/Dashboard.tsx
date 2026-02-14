@@ -16,6 +16,7 @@ import { PersonalizedInsights } from "@/components/biometrics/PersonalizedInsigh
 import { SessionFlow } from "@/components/session/SessionFlow";
 import { RecommendationEngine } from "@/components/music/RecommendationEngine";
 import { SmartScheduler } from "@/components/scheduling/SmartScheduler";
+import { RecentSessionWidget } from "@/components/dashboard/RecentSessionWidget";
 import type { User } from "@supabase/supabase-js";
 
 interface ActivityType {
@@ -192,6 +193,11 @@ const Dashboard = () => {
           <p className="text-muted-foreground">
             Play music from multiple sources - no API keys required!
           </p>
+        </section>
+
+        {/* Recent Session Stats & Streak */}
+        <section className="mb-8">
+          <RecentSessionWidget />
         </section>
 
         {/* Session Flow - Dedicated Listening Session */}
