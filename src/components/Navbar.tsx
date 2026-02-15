@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { Music2, Menu, X } from "lucide-react";
+import { Music2, Menu, X, Smartphone } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 interface NavbarProps {
   onLogin: () => void;
@@ -33,6 +34,10 @@ const Navbar = ({ onLogin, onRegister }: NavbarProps) => {
             <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">
               Pricing
             </a>
+            <Link to="/app" className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+              <Smartphone className="w-3.5 h-3.5" />
+              Get the App
+            </Link>
           </div>
 
           {/* Desktop Actions */}
@@ -68,6 +73,10 @@ const Navbar = ({ onLogin, onRegister }: NavbarProps) => {
             <a href="#pricing" onClick={() => setIsOpen(false)} className="block text-muted-foreground hover:text-foreground transition-colors py-2">
               Pricing
             </a>
+            <Link to="/app" onClick={() => setIsOpen(false)} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors py-2">
+              <Smartphone className="w-4 h-4" />
+              Get the App
+            </Link>
             <div className="flex flex-col gap-2 pt-4 border-t border-border/50">
               <Button variant="ghost" onClick={onLogin} className="w-full justify-center">
                 Sign In
