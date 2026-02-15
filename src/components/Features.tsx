@@ -1,45 +1,45 @@
-import { Music, BarChart3, Clock, Headphones, Zap, Shield } from "lucide-react";
+import { Brain, BarChart3, Activity, Headphones, Zap, Shield } from "lucide-react";
 
 const features = [
   {
-    icon: Music,
-    title: "Spotify Integration",
-    description: "Connect your Spotify account to seamlessly track and manage your listening history.",
+    icon: Activity,
+    title: "Live Biometric Tracking",
+    description: "Connect heart rate monitors, EEG headbands, and wearables to feed real-time data into your music engine.",
     color: "text-accent",
     bgColor: "bg-accent/10",
   },
   {
-    icon: BarChart3,
-    title: "Listening Analytics",
-    description: "Discover patterns in your music habits with detailed insights and visualizations.",
+    icon: Brain,
+    title: "Adaptive AI Engine",
+    description: "Our AI analyzes your brainwaves, stress, and focus to dynamically adjust tempo, energy, and genre in real-time.",
     color: "text-primary",
     bgColor: "bg-primary/10",
   },
   {
-    icon: Clock,
-    title: "Session Tracking",
-    description: "Log your listening sessions and build a complete picture of your music journey.",
+    icon: BarChart3,
+    title: "Flow State Analytics",
+    description: "Visualize how music shifts your biometrics over time with interactive timelines and correlation charts.",
     color: "text-accent",
     bgColor: "bg-accent/10",
   },
   {
     icon: Headphones,
-    title: "Smart Playlists",
-    description: "Create routine-based playlists that match your daily activities and moods.",
+    title: "Spotify & Jamendo Integration",
+    description: "Auto-queue the perfect tracks from Spotify or free Jamendo libraries based on your body's signals.",
     color: "text-primary",
     bgColor: "bg-primary/10",
   },
   {
     icon: Zap,
-    title: "Real-time Sync",
-    description: "Your data syncs instantly across all devices for a seamless experience.",
+    title: "Real-time Adaptation",
+    description: "Watch your playlist morph live as your heart rate climbs during a workout or your focus deepens in a study session.",
     color: "text-accent",
     bgColor: "bg-accent/10",
   },
   {
     icon: Shield,
     title: "Privacy First",
-    description: "Your music data is encrypted and never shared with third parties.",
+    description: "Your biometric and listening data is encrypted end-to-end and never shared with third parties.",
     color: "text-primary",
     bgColor: "bg-primary/10",
   },
@@ -54,10 +54,10 @@ const Features = () => {
           <h2 className="text-4xl md:text-5xl font-bold mt-4 mb-6">
             Everything you need to
             <br />
-            <span className="text-gradient">master your music routine</span>
+            <span className="text-gradient">unlock your flow state</span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Powerful tools to track, analyze, and enhance your listening experience.
+            Biometric sensors meet adaptive AI — your body drives the soundtrack.
           </p>
         </div>
 
