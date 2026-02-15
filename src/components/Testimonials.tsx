@@ -1,4 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { motion } from "framer-motion";
 
 const testimonials = [
   {
@@ -46,9 +47,13 @@ const Testimonials = () => {
         </div>
 
         <div className="grid md:grid-cols-3 gap-8">
-          {testimonials.map((t) => (
-            <div
+          {testimonials.map((t, i) => (
+            <motion.div
               key={t.name}
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ duration: 0.5, delay: i * 0.15, ease: "easeOut" }}
               className="bg-card border border-border rounded-2xl p-8 flex flex-col gap-6 transition-all duration-300 hover:border-primary/40 hover:shadow-glow"
             >
               <p className="text-muted-foreground text-sm leading-relaxed flex-1 italic">
@@ -66,7 +71,7 @@ const Testimonials = () => {
                   <p className="text-muted-foreground text-xs">{t.role}</p>
                 </div>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
