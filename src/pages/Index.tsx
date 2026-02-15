@@ -6,6 +6,7 @@ import Features from "@/components/Features";
 import HowItWorks from "@/components/HowItWorks";
 import Pricing from "@/components/Pricing";
 import Footer from "@/components/Footer";
+import Testimonials from "@/components/Testimonials";
 import BackToTop from "@/components/BackToTop";
 import AuthModal from "@/components/AuthModal";
 import { MobileOnboarding } from "@/components/mobile/MobileOnboarding";
@@ -59,6 +60,7 @@ const Index = () => {
       <Features />
       <HowItWorks />
       <Pricing onGetStarted={handleRegister} />
+      <Testimonials />
       <Footer />
       <BackToTop />
       <AuthModal
