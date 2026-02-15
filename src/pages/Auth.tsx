@@ -107,8 +107,8 @@ const Auth = () => {
           </CardTitle>
           <CardDescription>
             {isSignUp 
-              ? "Start your personalized music journey" 
-              : "Sign in to access your playlists"}
+              ? "Start your biometric music journey" 
+              : "Sign in to continue with BioMusic"}
           </CardDescription>
         </CardHeader>
         <CardContent>

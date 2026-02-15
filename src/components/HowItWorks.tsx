@@ -7,27 +7,27 @@ const steps = [
     title: "Connect Your Body",
     description:
       "Pair a heart rate monitor, Muse EEG headband, or any Bluetooth wearable. BioMusic reads your pulse, brainwaves, and stress signals in real-time.",
-    accent: "from-red-500/20 to-orange-500/20",
-    iconColor: "text-red-400",
-    borderColor: "border-red-500/30",
+    accent: "from-primary/20 to-primary/10",
+    iconColor: "text-primary",
+    borderColor: "border-primary/30",
   },
   {
     number: "02",
     icon: Brain,
     title: "AI Analyzes Your State",
     description:
-      "Our adaptive engine evaluates focus, relaxation, and flow metrics every 30 seconds — detecting when you're drifting or locking in.",
-    accent: "from-purple-500/20 to-indigo-500/20",
-    iconColor: "text-purple-400",
-    borderColor: "border-purple-500/30",
+      "Every 30 seconds, our adaptive engine evaluates your focus, relaxation, and stress levels to understand exactly what your body needs.",
+    accent: "from-accent/20 to-accent/10",
+    iconColor: "text-accent",
+    borderColor: "border-accent/30",
   },
   {
     number: "03",
     icon: Music,
     title: "Music Adapts Instantly",
     description:
-      "Tempo, energy, and genre shift automatically to match your biometric goals — pushing you into flow or calming you into deep rest.",
-    accent: "from-primary/20 to-amber-500/20",
+      "Tempo, energy, and genre shift automatically. Stressed? Calming ambient fades in. In the zone? The beat intensifies to keep you there.",
+    accent: "from-primary/20 to-primary/10",
     iconColor: "text-primary",
     borderColor: "border-primary/30",
   },
@@ -36,10 +36,10 @@ const steps = [
     icon: Sparkles,
     title: "Reach Flow State",
     description:
-      "Over time, BioMusic learns your personal patterns — what music triggers your best focus, deepest sleep, or strongest workouts.",
-    accent: "from-green-500/20 to-teal-500/20",
-    iconColor: "text-green-400",
-    borderColor: "border-green-500/30",
+      "Over time, BioMusic learns your unique patterns — which tracks trigger focus, which calm anxiety — creating a truly personalized soundtrack for life.",
+    accent: "from-accent/20 to-accent/10",
+    iconColor: "text-accent",
+    borderColor: "border-accent/30",
   },
 ];
 
