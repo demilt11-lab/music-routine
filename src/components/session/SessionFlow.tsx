@@ -26,6 +26,7 @@ import { SessionSummaryReport } from "./SessionSummaryReport";
 import { PredictiveQueueBuilder } from "./PredictiveQueueBuilder";
 import { ActivityStartingRecommendation } from "./ActivityStartingRecommendation";
 import { LiveAdaptationFeed, type AdaptationEvent } from "./LiveAdaptationFeed";
+import { BiometricMusicMapper } from "./BiometricMusicMapper";
 import { useActivityStartingSong } from "@/hooks/useActivityStartingSong";
 import { MusicPlayer } from "@/components/music/MusicPlayer";
 import { EEGReading } from "@/hooks/useMuseEEG";
@@ -825,6 +826,20 @@ export function SessionFlow() {
                 className="h-3"
               />
             </div>
+
+            {/* Live Biometric → Music Mapping */}
+            <BiometricMusicMapper
+              heartRate={biometricState.currentReading?.heartRate || 70}
+              stressLevel={biometricState.currentReading?.stressLevel || 30}
+              focusScore={biometricState.currentReading?.focusScore || 50}
+              relaxationScore={biometricState.currentReading?.relaxationScore || 50}
+              flowState={biometricState.flowState}
+              targetTempo={adaptiveMusic.state.currentRecommendation?.targetTempo}
+              targetEnergy={adaptiveMusic.state.currentRecommendation?.targetEnergy}
+              action={adaptiveMusic.state.currentRecommendation?.action}
+              reasoning={adaptiveMusic.state.currentRecommendation?.reasoning}
+              isAdaptiveEnabled={adaptiveMusic.state.isEnabled}
+            />
 
             {/* Now Playing - Integrated Music Player */}
             {jamendo.currentTrack && (
