@@ -19,7 +19,7 @@ const Navbar = ({ onLogin, onRegister }: NavbarProps) => {
             <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-glow transition-transform group-hover:scale-105">
               <Music2 className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold">Routine</span>
+            <span className="text-xl font-bold">BioMusic</span>
           </a>
 
           {/* Desktop Navigation */}

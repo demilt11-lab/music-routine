@@ -96,7 +96,7 @@ const AuthModal = ({ isOpen, onClose, mode, onToggleMode }: AuthModalProps) => {
           </DialogTitle>
           <p className="text-center text-muted-foreground text-sm">
             {mode === "login"
-              ? "Sign in to continue to Routine Music"
+              ? "Sign in to continue to BioMusic"
               : "Get started with your music journey"}
           </p>
         </DialogHeader>

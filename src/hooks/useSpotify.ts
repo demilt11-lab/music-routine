@@ -112,7 +112,7 @@ export function useSpotify(onTrackPlay?: (track: SpotifyTrack) => void) {
       if (!SpotifySDK) return;
 
       const player = new SpotifySDK.Player({
-        name: "Routine Music",
+        name: "BioMusic",
         getOAuthToken: async (cb: (token: string) => void) => {
           const t = await getValidToken();
           if (t) cb(t);
