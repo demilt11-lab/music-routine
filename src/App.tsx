@@ -11,6 +11,7 @@ import WeeklyInsights from "./pages/WeeklyInsights";
 import MonthlyProgress from "./pages/MonthlyProgress";
 import Settings from "./pages/Settings";
 import TrackFeedback from "./pages/TrackFeedback";
+import AppListing from "./pages/AppListing";
 import NotFound from "./pages/NotFound";
 import { MobileNavBar } from "./components/mobile/MobileNavBar";
 import ScrollToTop from "./components/ScrollToTop";
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/monthly" element={<MonthlyProgress />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/feedback" element={<TrackFeedback />} />
+            <Route path="/app" element={<AppListing />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <MobileNavBar />
