@@ -212,7 +212,7 @@ export function useSpotify(onTrackPlay?: (track: SpotifyTrack) => void) {
     };
   }, [isPlaying, sdkReady]);
 
-  // Handle Spotify OAuth redirect callback
+  // Handle Spotify OAuth redirect callback (for the tab that received the redirect)
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const spotifyCode = urlParams.get('spotify_code');
@@ -228,6 +228,23 @@ export function useSpotify(onTrackPlay?: (track: SpotifyTrack) => void) {
       window.history.replaceState({}, '', url.toString());
       toast.error("Spotify authorization was denied");
     }
+  }, []);
+
+  // Listen for cross-tab localStorage changes (detects when OAuth completes in another tab)
+  useEffect(() => {
+    const handler = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY && e.newValue) {
+        try {
+          const tokens: SpotifyTokens = JSON.parse(e.newValue);
+          if (tokens.access_token && Date.now() < tokens.expires_at) {
+            setIsConnected(true);
+            toast.success("Connected to Spotify!");
+          }
+        } catch {}
+      }
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
   }, []);
 
   // Audio element event listeners (fallback for non-Premium)
@@ -263,12 +280,15 @@ export function useSpotify(onTrackPlay?: (track: SpotifyTrack) => void) {
 
       const authUrl = new URL(data.url);
       authUrl.searchParams.set('state', window.location.origin);
-      // Use full-page redirect — popup flow breaks because Spotify's
-      // cross-origin redirects clear window.opener in most browsers.
-      window.location.href = authUrl.toString();
+      // Open in a new tab — iframe prevents direct navigation, and
+      // popup postMessage breaks after Spotify's cross-origin redirects.
+      // The callback will redirect back to the app with spotify_code param,
+      // which writes to localStorage. We detect this via the storage event.
+      window.open(authUrl.toString(), '_blank');
     } catch (err) {
       toast.error("Failed to connect to Spotify");
       console.error(err);
+    } finally {
       setIsLoading(false);
     }
   }, []);
