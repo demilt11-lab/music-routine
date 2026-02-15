@@ -13,6 +13,7 @@ import Settings from "./pages/Settings";
 import TrackFeedback from "./pages/TrackFeedback";
 import NotFound from "./pages/NotFound";
 import { MobileNavBar } from "./components/mobile/MobileNavBar";
+import ScrollToTop from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <ScrollToTop />
         <div className="min-h-screen pb-16 md:pb-0">
           <Routes>
             <Route path="/" element={<Index />} />

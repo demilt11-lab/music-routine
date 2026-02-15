@@ -6,6 +6,7 @@ import Features from "@/components/Features";
 import HowItWorks from "@/components/HowItWorks";
 import Pricing from "@/components/Pricing";
 import Footer from "@/components/Footer";
+import BackToTop from "@/components/BackToTop";
 import AuthModal from "@/components/AuthModal";
 import { MobileOnboarding } from "@/components/mobile/MobileOnboarding";
 import { useOnboarding } from "@/hooks/useOnboarding";
@@ -59,6 +60,7 @@ const Index = () => {
       <HowItWorks />
       <Pricing onGetStarted={handleRegister} />
       <Footer />
+      <BackToTop />
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
