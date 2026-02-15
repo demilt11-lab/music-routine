@@ -1,4 +1,5 @@
-import { Music2, Github, Twitter } from "lucide-react";
+import { Music2, Github, Twitter, Smartphone } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Footer = () => {
   return (
@@ -18,6 +19,10 @@ const Footer = () => {
             <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
             <a href="#" className="hover:text-foreground transition-colors">Terms</a>
             <a href="#" className="hover:text-foreground transition-colors">Contact</a>
+            <Link to="/app" className="hover:text-foreground transition-colors flex items-center gap-1">
+              <Smartphone className="w-3.5 h-3.5" />
+              Get the App
+            </Link>
           </div>
 
           {/* Social */}
