@@ -52,7 +52,7 @@ function getDailyTip(): string {
   return DAILY_TIPS[dayOfYear % DAILY_TIPS.length];
 }
 
-const RECAP_DISMISSED_KEY = "mindtune_recap_dismissed";
+const RECAP_DISMISSED_KEY = "biomusic_recap_dismissed";
 
 interface WeeklyStats {
   sessionsThisWeek: number;
