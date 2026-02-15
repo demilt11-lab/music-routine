@@ -87,7 +87,7 @@ export function useSpotify() {
     }
   }, []);
 
-  // Listen for auth callback via postMessage
+  // Listen for auth callback via postMessage or URL params
   useEffect(() => {
     const handler = async (event: MessageEvent) => {
       if (event.data?.type !== 'spotify-auth') return;
@@ -101,11 +101,21 @@ export function useSpotify() {
     };
     window.addEventListener('message', handler);
 
-    // Also check localStorage fallback
-    const code = localStorage.getItem('spotify_auth_code');
-    if (code) {
-      localStorage.removeItem('spotify_auth_code');
-      exchangeCode(code);
+    // Check URL params fallback (when popup was blocked)
+    const urlParams = new URLSearchParams(window.location.search);
+    const spotifyCode = urlParams.get('spotify_code');
+    const spotifyError = urlParams.get('spotify_error');
+    if (spotifyCode) {
+      // Clean URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete('spotify_code');
+      window.history.replaceState({}, '', url.toString());
+      exchangeCode(spotifyCode);
+    } else if (spotifyError) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('spotify_error');
+      window.history.replaceState({}, '', url.toString());
+      toast.error("Spotify authorization was denied");
     }
 
     return () => window.removeEventListener('message', handler);
@@ -144,11 +154,16 @@ export function useSpotify() {
       });
       if (error || data?.error) throw new Error(data?.error || 'Failed to get auth URL');
 
+      // Append state param with app origin for fallback redirect
+      const authUrl = new URL(data.url);
+      authUrl.searchParams.set('state', window.location.origin);
+      const authUrlStr = authUrl.toString();
+
       // Open Spotify auth in popup
-      const popup = window.open(data.url, 'spotify-auth', 'width=500,height=700');
+      const popup = window.open(authUrlStr, 'spotify-auth', 'width=500,height=700');
       if (!popup) {
         // Fallback: redirect in same window
-        window.location.href = data.url;
+        window.location.href = authUrlStr;
       }
     } catch (err) {
       toast.error("Failed to connect to Spotify");
