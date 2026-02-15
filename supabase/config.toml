@@ -2,3 +2,9 @@ project_id = "iygbnnvsojlgztqvcghy"
 
 [functions.generate-playlist]
 verify_jwt = false
+
+[functions.spotify-auth]
+verify_jwt = false
+
+[functions.spotify-callback]
+verify_jwt = false

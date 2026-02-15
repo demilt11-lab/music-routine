@@ -1,26 +1,34 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Youtube, Headphones } from "lucide-react";
+import { Upload, Youtube, Headphones, Music } from "lucide-react";
 import { LocalMusicUpload } from "./LocalMusicUpload";
 import { YouTubeMusicPlayer } from "./YouTubeMusicPlayer";
 import { JamendoExplorer } from "./JamendoExplorer";
+import { SpotifyPlayer } from "./SpotifyPlayer";
 import { MusicPlayer } from "./MusicPlayer";
 import { useLocalMusic } from "@/hooks/useLocalMusic";
 import { useYouTubeMusic } from "@/hooks/useYouTubeMusic";
 import { useJamendo } from "@/hooks/useJamendo";
+import { useSpotify } from "@/hooks/useSpotify";
 
 export function MusicTabs() {
   const localMusic = useLocalMusic();
   const youtubeMusic = useYouTubeMusic();
   const jamendo = useJamendo();
+  const spotify = useSpotify();
 
   // Determine which player should be active
   const activeLocalTrack = localMusic.currentTrack;
   const activeJamendoTrack = jamendo.currentTrack;
+  const activeSpotifyTrack = spotify.currentTrack;
 
   return (
     <div className="space-y-4">
-      <Tabs defaultValue="jamendo" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+      <Tabs defaultValue="spotify" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="spotify" className="gap-2">
+            <Music className="w-4 h-4" />
+            <span className="hidden sm:inline">Spotify</span>
+          </TabsTrigger>
           <TabsTrigger value="jamendo" className="gap-2">
             <Headphones className="w-4 h-4" />
             <span className="hidden sm:inline">Free Music</span>
@@ -34,6 +42,21 @@ export function MusicTabs() {
             <span className="hidden sm:inline">YouTube</span>
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="spotify" className="mt-4">
+          <SpotifyPlayer
+            isConnected={spotify.isConnected}
+            isLoading={spotify.isLoading}
+            tracks={spotify.tracks}
+            currentTrack={spotify.currentTrack}
+            isPlaying={spotify.isPlaying}
+            onConnect={spotify.connect}
+            onDisconnect={spotify.disconnect}
+            onSearch={spotify.search}
+            onPlay={spotify.play}
+            onPause={spotify.pause}
+          />
+        </TabsContent>
 
         <TabsContent value="jamendo" className="mt-4">
           <JamendoExplorer
@@ -80,9 +103,26 @@ export function MusicTabs() {
       {/* Hidden audio elements */}
       <audio ref={localMusic.audioRef} className="hidden" />
       <audio ref={jamendo.audioRef} className="hidden" />
+      <audio ref={spotify.audioRef} className="hidden" />
+
+      {/* Global Player - Spotify */}
+      {activeSpotifyTrack && (
+        <MusicPlayer
+          currentTrack={{
+            title: activeSpotifyTrack.name,
+            artist: activeSpotifyTrack.artist,
+            image: activeSpotifyTrack.image,
+          }}
+          isPlaying={spotify.isPlaying}
+          currentTime={spotify.currentTime}
+          duration={spotify.duration}
+          onPlayPause={spotify.togglePlay}
+          onSeek={spotify.seek}
+        />
+      )}
 
       {/* Global Player - Local Music */}
-      {activeLocalTrack && (
+      {activeLocalTrack && !activeSpotifyTrack && (
         <MusicPlayer
           currentTrack={{
             title: activeLocalTrack.title,
@@ -103,7 +143,7 @@ export function MusicTabs() {
       )}
 
       {/* Global Player - Jamendo */}
-      {activeJamendoTrack && !activeLocalTrack && (
+      {activeJamendoTrack && !activeLocalTrack && !activeSpotifyTrack && (
         <MusicPlayer
           currentTrack={{
             title: activeJamendoTrack.name,
