@@ -19,7 +19,7 @@ interface QueuedTrack {
   tempo: number;
   energy: number;
   audioUrl?: string;
-  source: "jamendo" | "local" | "recommendation";
+  source: "jamendo" | "local" | "recommendation" | "spotify";
   reason?: string;
 }
 
