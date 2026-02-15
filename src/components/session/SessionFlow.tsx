@@ -881,6 +881,8 @@ export function SessionFlow() {
                 onAutoPlayToggle={(enabled) => {
                   if (enabled) {
                     autoPlayQueue.enableAutoPlay();
+                    // Reset dedup so the current recommendation triggers a fresh search
+                    lastRecommendationRef.current = null;
                     // Load initial tracks for the activity
                     jamendo.loadByMood(selectedActivity.name);
                   } else {
