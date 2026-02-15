@@ -1,9 +1,10 @@
 import { useRef, useEffect } from "react";
 import {
   TrendingUp, TrendingDown, Zap, Minus, Target,
-  Music2, Clock, Heart, Brain, Sparkles
+  Music2, Clock, Heart, Brain, Sparkles, ThumbsUp, ThumbsDown
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
@@ -19,12 +20,16 @@ export interface AdaptationEvent {
     targetEnergy?: number;
     source?: string;
     flowState?: string;
+    trackTitle?: string;
+    trackArtist?: string;
   };
 }
 
 interface LiveAdaptationFeedProps {
   events: AdaptationEvent[];
   maxVisible?: number;
+  onFeedback?: (trackTitle: string, trackArtist: string, feedback: "up" | "down", event: AdaptationEvent) => void;
+  getFeedback?: (trackTitle: string, trackArtist: string) => "up" | "down" | null;
 }
 
 const typeIcons: Record<string, React.ReactNode> = {
@@ -56,7 +61,11 @@ function formatTime(date: Date): string {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
-export function LiveAdaptationFeed({ events, maxVisible = 50 }: LiveAdaptationFeedProps) {
+function hasTrackInfo(event: AdaptationEvent): boolean {
+  return !!(event.details?.trackTitle && event.details?.trackArtist);
+}
+
+export function LiveAdaptationFeed({ events, maxVisible = 50, onFeedback, getFeedback }: LiveAdaptationFeedProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const visibleEvents = events.slice(0, maxVisible);
 
@@ -89,60 +98,100 @@ export function LiveAdaptationFeed({ events, maxVisible = 50 }: LiveAdaptationFe
       </div>
       <ScrollArea className="h-[280px]" ref={scrollRef}>
         <div className="p-2 space-y-1.5">
-          {visibleEvents.map((event) => (
-            <div
-              key={event.id}
-              className={cn(
-                "flex gap-2 p-2 rounded-md border text-sm transition-all animate-in fade-in slide-in-from-top-1 duration-300",
-                typeColors[event.type] || "bg-muted/30 border-border"
-              )}
-            >
-              <div className="mt-0.5 shrink-0">
-                {typeIcons[event.type] || <Target className="w-3.5 h-3.5" />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="font-medium text-xs">{event.title}</span>
-                  {event.details?.action && (
-                    <Badge
-                      variant="secondary"
-                      className={cn(
-                        "text-[10px] px-1.5 py-0",
-                        actionBadgeColors[event.details.action] || ""
-                      )}
-                    >
-                      {event.details.action === "increase_tempo" && <TrendingUp className="w-2.5 h-2.5 mr-0.5" />}
-                      {event.details.action === "decrease_tempo" && <TrendingDown className="w-2.5 h-2.5 mr-0.5" />}
-                      {event.details.action === "increase_energy" && <Zap className="w-2.5 h-2.5 mr-0.5" />}
-                      {event.details.action === "decrease_energy" && <Minus className="w-2.5 h-2.5 mr-0.5" />}
-                      {event.details.action.replace("_", " ")}
-                    </Badge>
-                  )}
-                  {event.details?.source && (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                      {event.details.source}
-                    </Badge>
-                  )}
+          {visibleEvents.map((event) => {
+            const trackTitle = event.details?.trackTitle;
+            const trackArtist = event.details?.trackArtist;
+            const canFeedback = onFeedback && hasTrackInfo(event) && trackTitle && trackArtist;
+            const currentFeedback = canFeedback && getFeedback ? getFeedback(trackTitle, trackArtist) : null;
+
+            return (
+              <div
+                key={event.id}
+                className={cn(
+                  "flex gap-2 p-2 rounded-md border text-sm transition-all animate-in fade-in slide-in-from-top-1 duration-300",
+                  typeColors[event.type] || "bg-muted/30 border-border"
+                )}
+              >
+                <div className="mt-0.5 shrink-0">
+                  {typeIcons[event.type] || <Target className="w-3.5 h-3.5" />}
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                  {event.description}
-                </p>
-                {(event.details?.targetTempo || event.details?.targetEnergy) && (
-                  <div className="flex gap-2 mt-1 text-[10px] text-muted-foreground">
-                    {event.details.targetTempo && (
-                      <span>{event.details.targetTempo} BPM</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-medium text-xs">{event.title}</span>
+                    {event.details?.action && (
+                      <Badge
+                        variant="secondary"
+                        className={cn(
+                          "text-[10px] px-1.5 py-0",
+                          actionBadgeColors[event.details.action] || ""
+                        )}
+                      >
+                        {event.details.action === "increase_tempo" && <TrendingUp className="w-2.5 h-2.5 mr-0.5" />}
+                        {event.details.action === "decrease_tempo" && <TrendingDown className="w-2.5 h-2.5 mr-0.5" />}
+                        {event.details.action === "increase_energy" && <Zap className="w-2.5 h-2.5 mr-0.5" />}
+                        {event.details.action === "decrease_energy" && <Minus className="w-2.5 h-2.5 mr-0.5" />}
+                        {event.details.action.replace("_", " ")}
+                      </Badge>
                     )}
-                    {event.details.targetEnergy !== undefined && (
-                      <span>{Math.round(event.details.targetEnergy * 100)}% energy</span>
+                    {event.details?.source && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                        {event.details.source}
+                      </Badge>
                     )}
                   </div>
-                )}
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                    {event.description}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {(event.details?.targetTempo || event.details?.targetEnergy) && (
+                      <div className="flex gap-2 text-[10px] text-muted-foreground">
+                        {event.details.targetTempo && (
+                          <span>{event.details.targetTempo} BPM</span>
+                        )}
+                        {event.details.targetEnergy !== undefined && (
+                          <span>{Math.round(event.details.targetEnergy * 100)}% energy</span>
+                        )}
+                      </div>
+                    )}
+                    {/* Thumbs up/down feedback buttons */}
+                    {canFeedback && (
+                      <div className="flex items-center gap-0.5 ml-auto">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={cn(
+                            "h-5 w-5 rounded-full",
+                            currentFeedback === "up"
+                              ? "bg-primary/20 text-primary"
+                              : "text-muted-foreground hover:text-primary"
+                          )}
+                          onClick={() => onFeedback(trackTitle, trackArtist, "up", event)}
+                        >
+                          <ThumbsUp className="w-2.5 h-2.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={cn(
+                            "h-5 w-5 rounded-full",
+                            currentFeedback === "down"
+                              ? "bg-destructive/20 text-destructive"
+                              : "text-muted-foreground hover:text-destructive"
+                          )}
+                          onClick={() => onFeedback(trackTitle, trackArtist, "down", event)}
+                        >
+                          <ThumbsDown className="w-2.5 h-2.5" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <span className="text-[10px] text-muted-foreground shrink-0 mt-0.5">
+                  {formatTime(event.timestamp)}
+                </span>
               </div>
-              <span className="text-[10px] text-muted-foreground shrink-0 mt-0.5">
-                {formatTime(event.timestamp)}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </ScrollArea>
     </div>

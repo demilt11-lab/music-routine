@@ -51,7 +51,8 @@ serve(async (req) => {
       activityType, 
       currentSong,
       targetFlowState = "in-flow",
-      recentReadings = []
+      recentReadings = [],
+      userPreferences,
     } = await req.json();
 
     if (!biometricState || !activityType) {
@@ -90,6 +91,18 @@ ${biometricState.meditationScore !== undefined ? `- Meditation Score: ${biometri
 - Focus indicator: ${biometricState.eegBeta && biometricState.eegTheta ? ((biometricState.eegBeta / (biometricState.eegTheta + biometricState.eegAlpha + 0.001)) > 0.7 ? "High" : "Moderate") : "Unknown"}
 ` : "";
 
+    // Build user preference section from feedback data
+    const preferencesSection = userPreferences ? `
+## User Preferences (from thumbs-up/down feedback):
+${userPreferences.preferenceDescription}
+${userPreferences.likedArtists?.length > 0 ? `- Preferred artists: ${userPreferences.likedArtists.join(", ")}` : ""}
+${userPreferences.dislikedArtists?.length > 0 ? `- AVOID these artists: ${userPreferences.dislikedArtists.join(", ")}` : ""}
+${userPreferences.likedTempoRange ? `- Preferred tempo range: ${userPreferences.likedTempoRange.min}-${userPreferences.likedTempoRange.max} BPM` : ""}
+${userPreferences.likedEnergyRange ? `- Preferred energy range: ${Math.round(userPreferences.likedEnergyRange.min * 100)}-${Math.round(userPreferences.likedEnergyRange.max * 100)}%` : ""}
+
+IMPORTANT: Strongly factor these preferences into your recommendations. Avoid disliked artists entirely. Prioritize songs similar to liked artists and preferred tempo/energy ranges.
+` : "";
+
     const systemPrompt = `You are an AI music therapist specializing in using music to optimize mental states through physiological entrainment. You analyze real-time biometric data${hasEEGData ? " including brainwave activity" : ""} and recommend specific music adjustments to guide users toward their target mental state.
 
 ## Current User State:
@@ -104,6 +117,7 @@ ${currentSong ? `"${currentSong.title}" by ${currentSong.artist} (${currentSong.
 
 ## Activity: ${activityType}
 ## Target State: ${targetFlowState}
+${preferencesSection}
 
 ## Biometric Trend Analysis:
 ${trend.description}

@@ -51,6 +51,7 @@ interface CurrentSong {
 }
 
 export function useAdaptiveMusic(activityType: string = "study") {
+  const userPreferencesRef = useRef<any>(null);
   const [state, setState] = useState<AdaptiveMusicState>({
     isEnabled: false,
     isLoading: false,
@@ -79,6 +80,7 @@ export function useAdaptiveMusic(activityType: string = "study") {
           currentSong: currentSongRef.current,
           targetFlowState,
           recentReadings: biometricHistory.current.slice(-10),
+          userPreferences: userPreferencesRef.current || undefined,
         },
       });
 
@@ -120,6 +122,10 @@ export function useAdaptiveMusic(activityType: string = "study") {
 
   const setCurrentSong = useCallback((song: CurrentSong | null) => {
     currentSongRef.current = song;
+  }, []);
+
+  const setUserPreferences = useCallback((preferences: any) => {
+    userPreferencesRef.current = preferences;
   }, []);
 
   const enable = useCallback((intervalMs: number = 30000) => {
@@ -175,6 +181,7 @@ export function useAdaptiveMusic(activityType: string = "study") {
     disable,
     updateBiometrics,
     setCurrentSong,
+    setUserPreferences,
     getImmediateRecommendation,
     fetchRecommendation,
   };
