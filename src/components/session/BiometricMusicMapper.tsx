@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Heart, Brain, Sparkles, Activity, Music, Zap, TrendingUp, TrendingDown, Minus, ArrowRight } from "lucide-react";
+import { Heart, Brain, Sparkles, Activity, Music, Zap, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -26,7 +26,92 @@ interface MappingLink {
   musicParam: string;
   musicValue: string;
   influence: "increasing" | "decreasing" | "stable";
-  strength: number; // 0-100
+  strength: number;
+}
+
+// Animated SVG connection line with flowing particles
+function ConnectionLine({
+  x1, y1, x2, y2,
+  influence,
+  strength,
+  index,
+}: {
+  x1: number; y1: number; x2: number; y2: number;
+  influence: "increasing" | "decreasing" | "stable";
+  strength: number;
+  index: number;
+}) {
+  const midX = (x1 + x2) / 2;
+  const curveOffset = (index - 1) * 12; // spread curves vertically
+  const midY = (y1 + y2) / 2 + curveOffset;
+  const path = `M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`;
+
+  const strokeColor =
+    influence === "increasing"
+      ? "hsl(var(--primary))"
+      : influence === "decreasing"
+      ? "hsl(220, 70%, 60%)"
+      : "hsl(var(--muted-foreground))";
+
+  const opacity = Math.max(0.25, strength / 100);
+  const particleCount = strength > 60 ? 3 : strength > 30 ? 2 : 1;
+  const duration = influence === "stable" ? 4 : 2.5;
+
+  return (
+    <g>
+      {/* Base path glow */}
+      <path
+        d={path}
+        fill="none"
+        stroke={strokeColor}
+        strokeWidth={1.5}
+        strokeOpacity={opacity * 0.3}
+        filter="url(#glow)"
+      />
+      {/* Main path */}
+      <path
+        d={path}
+        fill="none"
+        stroke={strokeColor}
+        strokeWidth={1}
+        strokeOpacity={opacity}
+        strokeDasharray="4 4"
+      >
+        <animate
+          attributeName="stroke-dashoffset"
+          from={influence === "decreasing" ? "0" : "80"}
+          to={influence === "decreasing" ? "80" : "0"}
+          dur={`${duration}s`}
+          repeatCount="indefinite"
+        />
+      </path>
+      {/* Flowing particles */}
+      {Array.from({ length: particleCount }).map((_, i) => (
+        <circle key={i} r={2.5} fill={strokeColor} opacity={opacity}>
+          <animateMotion
+            dur={`${duration + i * 0.4}s`}
+            repeatCount="indefinite"
+            begin={`${i * (duration / particleCount)}s`}
+            path={path}
+          />
+          <animate
+            attributeName="opacity"
+            values={`0;${opacity};${opacity};0`}
+            dur={`${duration + i * 0.4}s`}
+            repeatCount="indefinite"
+            begin={`${i * (duration / particleCount)}s`}
+          />
+          <animate
+            attributeName="r"
+            values="1.5;3;1.5"
+            dur={`${duration + i * 0.4}s`}
+            repeatCount="indefinite"
+            begin={`${i * (duration / particleCount)}s`}
+          />
+        </circle>
+      ))}
+    </g>
+  );
 }
 
 export function BiometricMusicMapper({
@@ -47,7 +132,6 @@ export function BiometricMusicMapper({
     const tempo = targetTempo || 120;
     const energy = targetEnergy || 0.5;
 
-    // Determine how each biometric influences the music output
     const hrInfluence: MappingLink["influence"] =
       heartRate > 85 ? "decreasing" : heartRate < 65 ? "increasing" : "stable";
     const stressInfluence: MappingLink["influence"] =
@@ -120,6 +204,27 @@ export function BiometricMusicMapper({
     );
   }
 
+  // SVG layout constants
+  const svgW = 360;
+  const svgH = 160;
+  const bioX = 60;
+  const musicX = 300;
+  const bioNodes = [
+    { y: 30, label: `${heartRate}`, sub: "HR", icon: "♥", color: "hsl(0, 70%, 60%)" },
+    { y: 80, label: `${stressLevel}%`, sub: "Stress", icon: "⚡", color: "hsl(30, 80%, 55%)" },
+    { y: 130, label: `${focusScore}%`, sub: "Focus", icon: "🧠", color: "hsl(270, 60%, 55%)" },
+  ];
+  const musicNodes = [
+    { y: 55, label: targetTempo ? `${targetTempo}` : "—", sub: "BPM", color: "hsl(var(--primary))" },
+    { y: 105, label: targetEnergy != null ? `${Math.round(targetEnergy * 100)}%` : "—", sub: "Energy", color: "hsl(40, 80%, 55%)" },
+  ];
+  // Connection map: bio index -> music index
+  const connections = [
+    { bioIdx: 0, musicIdx: 0 }, // HR -> Tempo
+    { bioIdx: 1, musicIdx: 1 }, // Stress -> Energy
+    { bioIdx: 2, musicIdx: 0 }, // Focus -> Tempo
+  ];
+
   return (
     <Card className="border-primary/20 bg-card/50 backdrop-blur overflow-hidden">
       <CardHeader className="pb-3">
@@ -136,109 +241,161 @@ export function BiometricMusicMapper({
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Central Flow Gauge */}
-        <div className="flex items-center justify-center gap-6">
-          {/* Bio Side */}
-          <div className="text-center space-y-1">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Body</p>
-            <div className="flex items-center gap-3">
-              <div className="text-center">
-                <Heart className="w-4 h-4 mx-auto text-red-500 animate-pulse" />
-                <span className="text-lg font-bold">{heartRate}</span>
-                <p className="text-[10px] text-muted-foreground">BPM</p>
-              </div>
-              <div className="text-center">
-                <Brain className="w-4 h-4 mx-auto text-purple-500" />
-                <span className="text-lg font-bold">{focusScore}%</span>
-                <p className="text-[10px] text-muted-foreground">Focus</p>
-              </div>
-            </div>
-          </div>
+        {/* Animated Connection Diagram */}
+        <div className="relative w-full flex justify-center">
+          <svg
+            viewBox={`0 0 ${svgW} ${svgH}`}
+            className="w-full max-w-sm"
+            style={{ height: "auto", aspectRatio: `${svgW}/${svgH}` }}
+          >
+            <defs>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
 
-          {/* Arrow with action */}
-          <div className="flex flex-col items-center gap-1">
-            <div className={cn(
-              "w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors",
-              flowState === "in-flow"
-                ? "border-green-500 bg-green-500/20 text-green-500"
-                : flowState === "entering"
-                ? "border-yellow-500 bg-yellow-500/20 text-yellow-500"
-                : "border-muted bg-muted/50 text-muted-foreground"
-            )}>
-              <ArrowRight className="w-5 h-5" />
-            </div>
-            <span className="text-[10px] text-muted-foreground capitalize">{flowState}</span>
-          </div>
+            {/* Connection lines */}
+            {mappings.length > 0 && connections.map((conn, i) => {
+              const mapping = mappings[conn.bioIdx];
+              if (!mapping) return null;
+              return (
+                <ConnectionLine
+                  key={i}
+                  x1={bioX + 30}
+                  y1={bioNodes[conn.bioIdx].y}
+                  x2={musicX - 30}
+                  y2={musicNodes[conn.musicIdx].y}
+                  influence={mapping.influence}
+                  strength={mapping.strength}
+                  index={i}
+                />
+              );
+            })}
 
-          {/* Music Side */}
-          <div className="text-center space-y-1">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Music</p>
-            <div className="flex items-center gap-3">
-              <div className="text-center">
-                <Music className="w-4 h-4 mx-auto text-primary" />
-                <span className="text-lg font-bold">{targetTempo || "—"}</span>
-                <p className="text-[10px] text-muted-foreground">BPM</p>
-              </div>
-              <div className="text-center">
-                <Zap className="w-4 h-4 mx-auto text-amber-500" />
-                <span className="text-lg font-bold">
-                  {targetEnergy != null ? `${Math.round(targetEnergy * 100)}%` : "—"}
-                </span>
-                <p className="text-[10px] text-muted-foreground">Energy</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Mapping Links */}
-        {mappings.length > 0 && (
-          <div className="space-y-2">
-            {mappings.map((mapping, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 border border-border/30"
-              >
-                <div className={cn("shrink-0", mapping.bioColor)}>
-                  {mapping.bioIcon}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium">{mapping.label}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {mapping.bioValue}{mapping.label === "Heart Rate" ? "" : "%"}
-                    </span>
-                  </div>
-                  <div className="relative h-1.5 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={cn(
-                        "absolute inset-y-0 left-0 rounded-full transition-all duration-700",
-                        mapping.influence === "increasing"
-                          ? "bg-primary"
-                          : mapping.influence === "decreasing"
-                          ? "bg-blue-400"
-                          : "bg-muted-foreground/40"
-                      )}
-                      style={{ width: `${mapping.strength}%` }}
-                    />
-                  </div>
-                </div>
-                <div className={cn("shrink-0", actionColor)}>
-                  {mapping.influence === "increasing" ? (
-                    <TrendingUp className="w-3 h-3" />
-                  ) : mapping.influence === "decreasing" ? (
-                    <TrendingDown className="w-3 h-3" />
-                  ) : (
-                    <Minus className="w-3 h-3" />
-                  )}
-                </div>
-                <div className="shrink-0 text-right">
-                  <span className="text-[10px] text-muted-foreground">{mapping.musicParam}</span>
-                  <p className="text-xs font-medium">{mapping.musicValue}</p>
-                </div>
-              </div>
+            {/* Bio nodes */}
+            {bioNodes.map((node, i) => (
+              <g key={`bio-${i}`}>
+                <circle
+                  cx={bioX}
+                  cy={node.y}
+                  r={18}
+                  fill="hsl(var(--card))"
+                  stroke={node.color}
+                  strokeWidth={2}
+                  opacity={0.9}
+                />
+                <text
+                  x={bioX}
+                  y={node.y - 2}
+                  textAnchor="middle"
+                  fill={node.color}
+                  fontSize="11"
+                  fontWeight="bold"
+                >
+                  {node.label}
+                </text>
+                <text
+                  x={bioX}
+                  y={node.y + 10}
+                  textAnchor="middle"
+                  fill="hsl(var(--muted-foreground))"
+                  fontSize="8"
+                >
+                  {node.sub}
+                </text>
+              </g>
             ))}
-          </div>
-        )}
+
+            {/* Music nodes */}
+            {musicNodes.map((node, i) => (
+              <g key={`music-${i}`}>
+                <circle
+                  cx={musicX}
+                  cy={node.y}
+                  r={18}
+                  fill="hsl(var(--card))"
+                  stroke={node.color}
+                  strokeWidth={2}
+                  opacity={0.9}
+                />
+                <text
+                  x={musicX}
+                  y={node.y - 2}
+                  textAnchor="middle"
+                  fill={node.color}
+                  fontSize="11"
+                  fontWeight="bold"
+                >
+                  {node.label}
+                </text>
+                <text
+                  x={musicX}
+                  y={node.y + 10}
+                  textAnchor="middle"
+                  fill="hsl(var(--muted-foreground))"
+                  fontSize="8"
+                >
+                  {node.sub}
+                </text>
+              </g>
+            ))}
+
+            {/* Labels */}
+            <text x={bioX} y={svgH - 4} textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="9" fontWeight="600" letterSpacing="0.05em">
+              BODY
+            </text>
+            <text x={musicX} y={svgH - 4} textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize="9" fontWeight="600" letterSpacing="0.05em">
+              MUSIC
+            </text>
+
+            {/* Center flow state indicator */}
+            <circle
+              cx={svgW / 2}
+              cy={svgH / 2}
+              r={16}
+              fill={
+                flowState === "in-flow"
+                  ? "hsla(140, 60%, 45%, 0.2)"
+                  : flowState === "entering"
+                  ? "hsla(45, 80%, 50%, 0.2)"
+                  : "hsla(var(--muted), 0.3)"
+              }
+              stroke={
+                flowState === "in-flow"
+                  ? "hsl(140, 60%, 45%)"
+                  : flowState === "entering"
+                  ? "hsl(45, 80%, 50%)"
+                  : "hsl(var(--muted-foreground))"
+              }
+              strokeWidth={2}
+            >
+              {flowState === "in-flow" && (
+                <animate attributeName="r" values="14;18;14" dur="2s" repeatCount="indefinite" />
+              )}
+            </circle>
+            <text
+              x={svgW / 2}
+              y={svgH / 2 + 1}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fill={
+                flowState === "in-flow"
+                  ? "hsl(140, 60%, 45%)"
+                  : flowState === "entering"
+                  ? "hsl(45, 80%, 50%)"
+                  : "hsl(var(--muted-foreground))"
+              }
+              fontSize="8"
+              fontWeight="bold"
+            >
+              {flowState === "in-flow" ? "FLOW" : flowState === "entering" ? "ENTERING" : flowState === "exiting" ? "EXITING" : "IDLE"}
+            </text>
+          </svg>
+        </div>
 
         {/* Current AI Action */}
         {action && (
