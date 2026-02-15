@@ -6,9 +6,22 @@ serve(async (req) => {
   const error = url.searchParams.get('error');
   const state = url.searchParams.get('state') || '';
 
-  // state contains the app origin URL for redirect
-  const appOrigin = state || '';
+  // If state contains an app origin, do a server-side redirect back to the app
+  if (state) {
+    const redirectUrl = new URL('/dashboard', state);
+    if (code) {
+      redirectUrl.searchParams.set('spotify_code', code);
+    }
+    if (error) {
+      redirectUrl.searchParams.set('spotify_error', error);
+    }
+    return new Response(null, {
+      status: 302,
+      headers: { 'Location': redirectUrl.toString() },
+    });
+  }
 
+  // Fallback: try postMessage for popup flow
   const html = `<!DOCTYPE html>
 <html>
 <head><title>Spotify Auth</title></head>
@@ -17,23 +30,14 @@ serve(async (req) => {
   const params = new URLSearchParams(window.location.search);
   const code = params.get('code');
   const error = params.get('error');
-  const appOrigin = params.get('state') || '';
-  
   if (window.opener) {
     window.opener.postMessage({ type: 'spotify-auth', code, error }, '*');
     window.close();
   } else {
-    // Fallback: redirect back to the app with code in hash
-    const redirectUrl = appOrigin ? appOrigin + '/dashboard' : '/dashboard';
-    const sep = redirectUrl.includes('?') ? '&' : '?';
-    if (code) {
-      window.location.href = redirectUrl + sep + 'spotify_code=' + encodeURIComponent(code);
-    } else {
-      window.location.href = redirectUrl + sep + 'spotify_error=' + encodeURIComponent(error || 'unknown');
-    }
+    document.body.innerHTML = '<p>Authentication complete. Please return to the app and try again.</p>';
   }
 </script>
-<p>Connecting to Spotify... Redirecting...</p>
+<p>Connecting to Spotify...</p>
 </body>
 </html>`;
 
