@@ -146,15 +146,11 @@ export function useWebBluetooth(): UseWebBluetoothReturn {
 
   const connectToDevice = async (device: { id: string; name: string; type: string; connected: boolean }): Promise<boolean> => {
     try {
-      // Get the actual BluetoothDevice from the browser
-      const nav = navigator as any;
-      const btDevice = await nav.bluetooth.requestDevice({
-        filters: [{ services: [HEART_RATE_SERVICE] }],
-        optionalServices: [BATTERY_SERVICE],
-      });
-
-      if (!btDevice.gatt) {
-        throw new Error("GATT server not available");
+      // Use the already-discovered BluetoothDevice from the ref
+      const btDevice = bluetoothDeviceRef.current;
+      
+      if (!btDevice?.gatt) {
+        throw new Error("No device available. Please scan for devices first.");
       }
 
       const server = await btDevice.gatt.connect();
