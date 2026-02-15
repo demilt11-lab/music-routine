@@ -6,35 +6,26 @@ serve(async (req) => {
   const error = url.searchParams.get('error');
   const state = url.searchParams.get('state') || '';
 
-  // If state contains an app origin, do a server-side redirect back to the app
-  if (state) {
-    const redirectUrl = new URL('/dashboard', state);
-    if (code) {
-      redirectUrl.searchParams.set('spotify_code', code);
-    }
-    if (error) {
-      redirectUrl.searchParams.set('spotify_error', error);
-    }
-    return new Response(null, {
-      status: 302,
-      headers: { 'Location': redirectUrl.toString() },
-    });
-  }
-
-  // Fallback: try postMessage for popup flow
+  // Always respond with an HTML page that uses postMessage to communicate
+  // back to the opener window, then closes the popup.
   const html = `<!DOCTYPE html>
 <html>
 <head><title>Spotify Auth</title></head>
 <body>
 <script>
-  const params = new URLSearchParams(window.location.search);
-  const code = params.get('code');
-  const error = params.get('error');
+  var code = ${JSON.stringify(code)};
+  var error = ${JSON.stringify(error)};
+  var origin = ${JSON.stringify(state)};
+
   if (window.opener) {
-    window.opener.postMessage({ type: 'spotify-auth', code, error }, '*');
+    window.opener.postMessage({ type: 'spotify-auth', code: code, error: error }, origin || '*');
     window.close();
   } else {
-    document.body.innerHTML = '<p>Authentication complete. Please return to the app and try again.</p>';
+    // Fallback: redirect back to the app with the code in query params
+    var redirectUrl = (origin || window.location.origin) + '/dashboard';
+    if (code) redirectUrl += '?spotify_code=' + encodeURIComponent(code);
+    if (error) redirectUrl += '?spotify_error=' + encodeURIComponent(error);
+    window.location.href = redirectUrl;
   }
 </script>
 <p>Connecting to Spotify...</p>
