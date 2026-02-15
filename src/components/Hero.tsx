@@ -33,7 +33,7 @@ const Hero = ({ onGetStarted }: HeroProps) => {
         <div className="animate-fade-in">
           <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
             <Sparkles className="w-4 h-4" />
-            Powered by Spotify
+            Biometric-Driven Music
           </span>
         </div>
 
@@ -41,17 +41,17 @@ const Hero = ({ onGetStarted }: HeroProps) => {
           className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight mb-6 animate-fade-in"
           style={{ animationDelay: '0.1s' }}
         >
-          <span className="text-foreground">Your Music</span>
+          <span className="text-foreground">Feel the Beat.</span>
           <br />
-          <span className="text-gradient">Your Routine</span>
+          <span className="text-gradient">Your Body Leads.</span>
         </h1>
 
         <p 
           className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 animate-fade-in"
           style={{ animationDelay: '0.2s' }}
         >
-          Track your listening sessions, discover patterns, and build the perfect 
-          soundtrack for your daily routine with Spotify integration.
+          BioMusic adapts your soundtrack in real-time using heart rate, brainwaves, 
+          and stress data — so every session hits your optimal flow state.
         </p>
 
         <div 
@@ -72,9 +72,9 @@ const Hero = ({ onGetStarted }: HeroProps) => {
           style={{ animationDelay: '0.5s' }}
         >
           {[
-            { value: "10K+", label: "Active Users" },
-            { value: "1M+", label: "Songs Tracked" },
-            { value: "50K+", label: "Sessions Logged" },
+            { value: "10K+", label: "Flow Sessions" },
+            { value: "1M+", label: "Bio Readings" },
+            { value: "50K+", label: "Tracks Adapted" },
           ].map((stat, i) => (
             <div key={i} className="text-center">
               <div className="text-3xl md:text-4xl font-bold text-gradient">{stat.value}</div>
