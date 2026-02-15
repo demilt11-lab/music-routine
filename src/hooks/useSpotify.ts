@@ -212,20 +212,8 @@ export function useSpotify(onTrackPlay?: (track: SpotifyTrack) => void) {
     };
   }, [isPlaying, sdkReady]);
 
-  // Listen for auth callback
+  // Handle Spotify OAuth redirect callback
   useEffect(() => {
-    const handler = async (event: MessageEvent) => {
-      if (event.data?.type !== 'spotify-auth') return;
-      if (event.data.error) {
-        toast.error("Spotify authorization was denied");
-        return;
-      }
-      if (event.data.code) {
-        await exchangeCode(event.data.code);
-      }
-    };
-    window.addEventListener('message', handler);
-
     const urlParams = new URLSearchParams(window.location.search);
     const spotifyCode = urlParams.get('spotify_code');
     const spotifyError = urlParams.get('spotify_error');
@@ -240,8 +228,6 @@ export function useSpotify(onTrackPlay?: (track: SpotifyTrack) => void) {
       window.history.replaceState({}, '', url.toString());
       toast.error("Spotify authorization was denied");
     }
-
-    return () => window.removeEventListener('message', handler);
   }, []);
 
   // Audio element event listeners (fallback for non-Premium)
@@ -277,16 +263,12 @@ export function useSpotify(onTrackPlay?: (track: SpotifyTrack) => void) {
 
       const authUrl = new URL(data.url);
       authUrl.searchParams.set('state', window.location.origin);
-      const authUrlStr = authUrl.toString();
-
-      const popup = window.open(authUrlStr, 'spotify-auth', 'width=500,height=700');
-      if (!popup) {
-        window.location.href = authUrlStr;
-      }
+      // Use full-page redirect — popup flow breaks because Spotify's
+      // cross-origin redirects clear window.opener in most browsers.
+      window.location.href = authUrl.toString();
     } catch (err) {
       toast.error("Failed to connect to Spotify");
       console.error(err);
-    } finally {
       setIsLoading(false);
     }
   }, []);
