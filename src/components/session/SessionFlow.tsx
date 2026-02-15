@@ -17,12 +17,14 @@ import { useAutoPlayQueue } from "@/hooks/useAutoPlayQueue";
 import { useJamendo, JamendoTrack } from "@/hooks/useJamendo";
 import { useAdaptiveMusic } from "@/hooks/useAdaptiveMusic";
 import { useFlowNotifications } from "@/hooks/useFlowNotifications";
+import { useSpotifyAutoQueue } from "@/hooks/useSpotifyAutoQueue";
 import { DeviceConnector } from "./DeviceConnector";
 import { EEGConnector } from "./EEGConnector";
 import { AdaptiveMusicPanel } from "./AdaptiveMusicPanel";
 import { SessionSummaryReport } from "./SessionSummaryReport";
 import { PredictiveQueueBuilder } from "./PredictiveQueueBuilder";
 import { ActivityStartingRecommendation } from "./ActivityStartingRecommendation";
+import { LiveAdaptationFeed, type AdaptationEvent } from "./LiveAdaptationFeed";
 import { useActivityStartingSong } from "@/hooks/useActivityStartingSong";
 import { MusicPlayer } from "@/components/music/MusicPlayer";
 import { EEGReading } from "@/hooks/useMuseEEG";
@@ -103,6 +105,9 @@ export function SessionFlow() {
   // Adaptive music recommendations
   const adaptiveMusic = useAdaptiveMusic(selectedActivity?.name || "study");
   
+  // Spotify auto-queue for adaptive recommendations
+  const spotifyAutoQueue = useSpotifyAutoQueue();
+  
   // Flow notifications for session milestones
   const flowNotifications = useFlowNotifications({
     audioEnabled: true,
@@ -110,11 +115,23 @@ export function SessionFlow() {
     toastEnabled: true,
   });
   
+  // Live adaptation feed events
+  const [adaptationEvents, setAdaptationEvents] = useState<AdaptationEvent[]>([]);
+  
   // Session milestone tracking
   const sessionMilestoneRef = useRef<number>(0);
   
   // Track last processed recommendation to avoid duplicate queue additions
   const lastRecommendationRef = useRef<string | null>(null);
+  
+  // Helper to add adaptation events
+  const addAdaptationEvent = useCallback((event: Omit<AdaptationEvent, "id" | "timestamp">) => {
+    setAdaptationEvents(prev => [{
+      ...event,
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      timestamp: new Date(),
+    }, ...prev].slice(0, 100));
+  }, []);
 
   // Fetch activity types
   useEffect(() => {
@@ -168,7 +185,7 @@ export function SessionFlow() {
     };
   }, [autoPlayQueue.state.isEnabled, autoPlayQueue, jamendo]);
 
-  // Auto-play: When recommendations come in, search Jamendo and queue tracks
+  // Auto-play: When recommendations come in, search Spotify first, then Jamendo fallback
   useEffect(() => {
     const recommendation = adaptiveMusic.state.currentRecommendation;
     if (!autoPlayQueue.state.isEnabled || !recommendation) return;
@@ -178,7 +195,64 @@ export function SessionFlow() {
     if (lastRecommendationRef.current === recommendationKey) return;
     lastRecommendationRef.current = recommendationKey;
 
+    // Log the recommendation as an adaptation event
+    addAdaptationEvent({
+      type: "recommendation",
+      title: "AI Recommendation",
+      description: recommendation.reasoning,
+      details: {
+        action: recommendation.action,
+        targetTempo: recommendation.targetTempo,
+        targetEnergy: recommendation.targetEnergy,
+      },
+    });
+
     const fetchAndQueueTracks = async () => {
+      // Try Spotify first if connected
+      if (spotifyAutoQueue.isSpotifyConnected()) {
+        const spotifyTracks = await spotifyAutoQueue.searchByRecommendation(
+          recommendation.targetTempo,
+          recommendation.targetEnergy,
+          selectedActivity?.name
+        );
+
+        if (spotifyTracks.length > 0) {
+          const queuedTracks = spotifyTracks.slice(0, 5).map((track) => ({
+            id: track.id,
+            title: track.name,
+            artist: track.artist,
+            tempo: recommendation.targetTempo,
+            energy: recommendation.targetEnergy,
+            audioUrl: track.preview_url || undefined,
+            source: "spotify" as const,
+            reason: recommendation.reasoning,
+          }));
+
+          autoPlayQueue.addToQueue(queuedTracks);
+
+          addAdaptationEvent({
+            type: "spotify_queue",
+            title: `Queued ${queuedTracks.length} Spotify tracks`,
+            description: `"${spotifyTracks[0].name}" by ${spotifyTracks[0].artist} + ${queuedTracks.length - 1} more`,
+            details: {
+              source: "Spotify",
+              targetTempo: recommendation.targetTempo,
+              targetEnergy: recommendation.targetEnergy,
+            },
+          });
+
+          // Dispatch event so MusicTabs/SpotifyPlayer can play the track
+          if (queuedTracks.length > 0) {
+            window.dispatchEvent(new CustomEvent("adaptive-spotify-play", {
+              detail: { uri: spotifyTracks[0].uri, name: spotifyTracks[0].name, artist: spotifyTracks[0].artist },
+            }));
+            toast.success(`Spotify auto-play: "${spotifyTracks[0].name}" based on your biometrics`);
+          }
+          return; // Don't fall through to Jamendo
+        }
+      }
+
+      // Fallback to Jamendo
       const tracks = await jamendo.searchByTempoEnergy(
         recommendation.targetTempo,
         recommendation.targetEnergy,
@@ -199,18 +273,29 @@ export function SessionFlow() {
 
         autoPlayQueue.addToQueue(queuedTracks);
 
+        addAdaptationEvent({
+          type: "track_change",
+          title: `Queued ${queuedTracks.length} Jamendo tracks`,
+          description: `"${tracks[0].name}" by ${tracks[0].artist_name} + ${queuedTracks.length - 1} more`,
+          details: {
+            source: "Jamendo",
+            targetTempo: recommendation.targetTempo,
+            targetEnergy: recommendation.targetEnergy,
+          },
+        });
+
         // If nothing is playing, start the first track
         if (!jamendo.currentTrack && queuedTracks.length > 0) {
           const firstTrack = tracks[0];
           jamendo.play(firstTrack);
-          autoPlayQueue.skipToNext(); // Move to index 0
+          autoPlayQueue.skipToNext();
           toast.success(`Auto-playing: "${firstTrack.name}" based on your biometrics`);
         }
       }
     };
 
     fetchAndQueueTracks();
-  }, [adaptiveMusic.state.currentRecommendation, autoPlayQueue.state.isEnabled, selectedActivity?.name]);
+  }, [adaptiveMusic.state.currentRecommendation, autoPlayQueue.state.isEnabled, selectedActivity?.name, addAdaptationEvent, spotifyAutoQueue]);
 
   // Update adaptive music with biometric data (including EEG)
   useEffect(() => {
@@ -388,7 +473,7 @@ export function SessionFlow() {
     }]);
   }, [addReading, biometricState.currentReading]);
 
-  // Track music adaptations when recommendations change
+  // Track music adaptations when recommendations change + add to live feed
   useEffect(() => {
     const recommendation = adaptiveMusic.state.currentRecommendation;
     if (recommendation && jamendo.currentTrack && step === "active") {
@@ -403,6 +488,22 @@ export function SessionFlow() {
       }]);
     }
   }, [adaptiveMusic.state.currentRecommendation?.reasoning]);
+
+  // Track flow state changes in live feed
+  useEffect(() => {
+    if (step === "active" && biometricState.flowState !== "none") {
+      addAdaptationEvent({
+        type: "flow_shift",
+        title: `Flow State: ${biometricState.flowState}`,
+        description: biometricState.flowState === "in-flow"
+          ? "You've entered flow state! Music is optimized to maintain it."
+          : biometricState.flowState === "entering"
+          ? "Approaching flow state — music adapting to guide you in."
+          : "Flow state fading — adjusting music to re-engage focus.",
+        details: { flowState: biometricState.flowState },
+      });
+    }
+  }, [biometricState.flowState, step, addAdaptationEvent]);
 
   const handleEndSession = () => {
     stopTracking();
@@ -458,6 +559,7 @@ export function SessionFlow() {
     setNotes("");
     setBiometricHistory([]);
     setMusicAdaptations([]);
+    setAdaptationEvents([]);
     setShowSummaryReport(false);
   };
 
@@ -790,6 +892,11 @@ export function SessionFlow() {
                   }
                 }}
               />
+            )}
+
+            {/* Live Adaptation Feed */}
+            {step === "active" && (
+              <LiveAdaptationFeed events={adaptationEvents} />
             )}
 
             {/* Predictive Queue Builder */}

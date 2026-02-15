@@ -423,6 +423,47 @@ export function useSpotify(onTrackPlay?: (track: SpotifyTrack) => void) {
     setIsPlaying(false);
   }, [sdkReady]);
 
+  // Listen for adaptive engine Spotify play requests
+  useEffect(() => {
+    const handler = async (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail?.name || !isConnected) return;
+
+      // Search for the track by name + artist
+      const token = await getValidToken();
+      if (!token) return;
+
+      try {
+        const res = await fetch(
+          `https://api.spotify.com/v1/search?q=${encodeURIComponent(`${detail.name} ${detail.artist}`)}&type=track&limit=1`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const t = data.tracks?.items?.[0];
+          if (t) {
+            const fullTrack: SpotifyTrack = {
+              id: t.id,
+              name: t.name,
+              artist: t.artists.map((a: any) => a.name).join(", "),
+              album: t.album.name,
+              image: t.album.images?.[0]?.url || "",
+              uri: t.uri,
+              duration_ms: t.duration_ms,
+              preview_url: t.preview_url,
+            };
+            play(fullTrack);
+          }
+        }
+      } catch (err) {
+        console.error("Adaptive Spotify play failed:", err);
+      }
+    };
+
+    window.addEventListener("adaptive-spotify-play", handler);
+    return () => window.removeEventListener("adaptive-spotify-play", handler);
+  }, [isConnected, play, getValidToken]);
+
   const togglePlay = useCallback(async () => {
     if (isPlaying) {
       await pause();
