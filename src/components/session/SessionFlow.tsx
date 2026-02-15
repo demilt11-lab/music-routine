@@ -18,6 +18,7 @@ import { useJamendo, JamendoTrack } from "@/hooks/useJamendo";
 import { useAdaptiveMusic } from "@/hooks/useAdaptiveMusic";
 import { useFlowNotifications } from "@/hooks/useFlowNotifications";
 import { useSpotifyAutoQueue } from "@/hooks/useSpotifyAutoQueue";
+import { useTrackFeedback } from "@/hooks/useTrackFeedback";
 import { DeviceConnector } from "./DeviceConnector";
 import { EEGConnector } from "./EEGConnector";
 import { AdaptiveMusicPanel } from "./AdaptiveMusicPanel";
@@ -107,6 +108,9 @@ export function SessionFlow() {
   
   // Spotify auto-queue for adaptive recommendations
   const spotifyAutoQueue = useSpotifyAutoQueue();
+  
+  // Track feedback (thumbs up/down)
+  const trackFeedback = useTrackFeedback(selectedActivity?.name);
   
   // Flow notifications for session milestones
   const flowNotifications = useFlowNotifications({
@@ -238,6 +242,8 @@ export function SessionFlow() {
               source: "Spotify",
               targetTempo: recommendation.targetTempo,
               targetEnergy: recommendation.targetEnergy,
+              trackTitle: spotifyTracks[0].name,
+              trackArtist: spotifyTracks[0].artist,
             },
           });
 
@@ -281,6 +287,8 @@ export function SessionFlow() {
             source: "Jamendo",
             targetTempo: recommendation.targetTempo,
             targetEnergy: recommendation.targetEnergy,
+            trackTitle: tracks[0].name,
+            trackArtist: tracks[0].artist_name,
           },
         });
 
@@ -322,6 +330,13 @@ export function SessionFlow() {
       });
     }
   }, [biometricState.currentReading, biometricState.flowState, biometricState.isTracking, adaptiveMusic, eegMetrics]);
+
+  // Sync user preferences into adaptive music engine
+  useEffect(() => {
+    if (trackFeedback.summary) {
+      adaptiveMusic.setUserPreferences(trackFeedback.summary);
+    }
+  }, [trackFeedback.summary, adaptiveMusic]);
 
   // Update current song info for adaptive music (Jamendo)
   useEffect(() => {
@@ -896,7 +911,20 @@ export function SessionFlow() {
 
             {/* Live Adaptation Feed */}
             {step === "active" && (
-              <LiveAdaptationFeed events={adaptationEvents} />
+              <LiveAdaptationFeed
+                events={adaptationEvents}
+                getFeedback={trackFeedback.getFeedback}
+                onFeedback={(trackTitle, trackArtist, feedback, event) => {
+                  trackFeedback.submitFeedback({
+                    trackTitle,
+                    trackArtist,
+                    feedback,
+                    activityType: selectedActivity?.name,
+                    targetTempo: event.details?.targetTempo,
+                    targetEnergy: event.details?.targetEnergy,
+                  });
+                }}
+              />
             )}
 
             {/* Predictive Queue Builder */}

@@ -338,6 +338,45 @@ export type Database = {
         }
         Relationships: []
       }
+      track_feedback: {
+        Row: {
+          activity_type: string | null
+          context: Json | null
+          created_at: string
+          feedback: string
+          id: string
+          target_energy: number | null
+          target_tempo: number | null
+          track_artist: string
+          track_title: string
+          user_id: string
+        }
+        Insert: {
+          activity_type?: string | null
+          context?: Json | null
+          created_at?: string
+          feedback: string
+          id?: string
+          target_energy?: number | null
+          target_tempo?: number | null
+          track_artist: string
+          track_title: string
+          user_id: string
+        }
+        Update: {
+          activity_type?: string | null
+          context?: Json | null
+          created_at?: string
+          feedback?: string
+          id?: string
+          target_energy?: number | null
+          target_tempo?: number | null
+          track_artist?: string
+          track_title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
