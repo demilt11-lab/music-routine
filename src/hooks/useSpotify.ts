@@ -38,27 +38,48 @@ function clearTokens() {
   localStorage.removeItem(STORAGE_KEY);
 }
 
-export function useSpotify() {
+// Load Spotify Web Playback SDK script
+function loadSpotifySDK(): Promise<void> {
+  return new Promise((resolve) => {
+    if ((window as any).Spotify) {
+      resolve();
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://sdk.scdn.co/spotify-player.js";
+    script.async = true;
+    document.body.appendChild(script);
+    (window as any).onSpotifyWebPlaybackSDKReady = () => resolve();
+  });
+}
+
+export function useSpotify(onTrackPlay?: (track: SpotifyTrack) => void) {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [tracks, setTracks] = useState<SpotifyTrack[]>([]);
   const [currentTrack, setCurrentTrack] = useState<SpotifyTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const audioRef = useRef<HTMLAudioElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [sdkReady, setSdkReady] = useState(false);
+  const [isPremium, setIsPremium] = useState(true);
+
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const playerRef = useRef<any>(null);
+  const deviceIdRef = useRef<string | null>(null);
+  const progressInterval = useRef<NodeJS.Timeout | null>(null);
+  const onTrackPlayRef = useRef(onTrackPlay);
+  onTrackPlayRef.current = onTrackPlay;
 
   const getValidToken = useCallback(async (): Promise<string | null> => {
     const tokens = getStoredTokens();
     if (!tokens) return null;
 
-    // If token is still valid (with 60s buffer)
     if (Date.now() < tokens.expires_at - 60000) {
       return tokens.access_token;
     }
 
-    // Refresh the token
     try {
       const { data, error } = await supabase.functions.invoke('spotify-auth', {
         body: { action: 'refresh_token', refresh_token: tokens.refresh_token },
@@ -79,6 +100,71 @@ export function useSpotify() {
     }
   }, []);
 
+  // Initialize Web Playback SDK when connected
+  const initializePlayer = useCallback(async () => {
+    const token = await getValidToken();
+    if (!token) return;
+
+    try {
+      await loadSpotifySDK();
+
+      const SpotifySDK = (window as any).Spotify;
+      if (!SpotifySDK) return;
+
+      const player = new SpotifySDK.Player({
+        name: "Routine Music",
+        getOAuthToken: async (cb: (token: string) => void) => {
+          const t = await getValidToken();
+          if (t) cb(t);
+        },
+        volume: 0.5,
+      });
+
+      player.addListener("ready", ({ device_id }: { device_id: string }) => {
+        deviceIdRef.current = device_id;
+        setSdkReady(true);
+        console.log("Spotify SDK ready, device:", device_id);
+      });
+
+      player.addListener("not_ready", () => {
+        deviceIdRef.current = null;
+        setSdkReady(false);
+      });
+
+      player.addListener("player_state_changed", (state: any) => {
+        if (!state) return;
+        setIsPlaying(!state.paused);
+        setCurrentTime(state.position / 1000);
+        setDuration(state.duration / 1000);
+      });
+
+      player.addListener("initialization_error", ({ message }: { message: string }) => {
+        console.error("Spotify SDK init error:", message);
+        setIsPremium(false);
+      });
+
+      player.addListener("authentication_error", ({ message }: { message: string }) => {
+        console.error("Spotify SDK auth error:", message);
+        setIsPremium(false);
+      });
+
+      player.addListener("account_error", ({ message }: { message: string }) => {
+        console.error("Spotify SDK account error:", message);
+        setIsPremium(false);
+      });
+
+      const connected = await player.connect();
+      if (connected) {
+        playerRef.current = player;
+      } else {
+        setIsPremium(false);
+      }
+    } catch (err) {
+      console.error("Failed to init Spotify SDK:", err);
+      setIsPremium(false);
+    }
+  }, [getValidToken]);
+
   // Check connection on mount
   useEffect(() => {
     const tokens = getStoredTokens();
@@ -87,7 +173,46 @@ export function useSpotify() {
     }
   }, []);
 
-  // Listen for auth callback via postMessage or URL params
+  // Initialize SDK when connected
+  useEffect(() => {
+    if (isConnected) {
+      initializePlayer();
+    }
+    return () => {
+      if (playerRef.current) {
+        playerRef.current.disconnect();
+        playerRef.current = null;
+      }
+      if (progressInterval.current) {
+        clearInterval(progressInterval.current);
+      }
+    };
+  }, [isConnected, initializePlayer]);
+
+  // Progress tracking for SDK playback
+  useEffect(() => {
+    if (isPlaying && sdkReady && playerRef.current) {
+      progressInterval.current = setInterval(async () => {
+        const state = await playerRef.current?.getCurrentState();
+        if (state) {
+          setCurrentTime(state.position / 1000);
+          setDuration(state.duration / 1000);
+        }
+      }, 1000);
+    } else {
+      if (progressInterval.current) {
+        clearInterval(progressInterval.current);
+        progressInterval.current = null;
+      }
+    }
+    return () => {
+      if (progressInterval.current) {
+        clearInterval(progressInterval.current);
+      }
+    };
+  }, [isPlaying, sdkReady]);
+
+  // Listen for auth callback
   useEffect(() => {
     const handler = async (event: MessageEvent) => {
       if (event.data?.type !== 'spotify-auth') return;
@@ -101,12 +226,10 @@ export function useSpotify() {
     };
     window.addEventListener('message', handler);
 
-    // Check URL params fallback (when popup was blocked)
     const urlParams = new URLSearchParams(window.location.search);
     const spotifyCode = urlParams.get('spotify_code');
     const spotifyError = urlParams.get('spotify_error');
     if (spotifyCode) {
-      // Clean URL
       const url = new URL(window.location.href);
       url.searchParams.delete('spotify_code');
       window.history.replaceState({}, '', url.toString());
@@ -121,7 +244,7 @@ export function useSpotify() {
     return () => window.removeEventListener('message', handler);
   }, []);
 
-  // Audio event listeners
+  // Audio element event listeners (fallback for non-Premium)
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -141,8 +264,6 @@ export function useSpotify() {
     };
   }, []);
 
-  const redirectUri = `${window.location.origin.replace('://id-preview--', '://').replace('.lovable.app', '.supabase.co')}/functions/v1/spotify-callback`;
-
   const connect = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -154,15 +275,12 @@ export function useSpotify() {
       });
       if (error || data?.error) throw new Error(data?.error || 'Failed to get auth URL');
 
-      // Append state param with app origin for fallback redirect
       const authUrl = new URL(data.url);
       authUrl.searchParams.set('state', window.location.origin);
       const authUrlStr = authUrl.toString();
 
-      // Open Spotify auth in popup
       const popup = window.open(authUrlStr, 'spotify-auth', 'width=500,height=700');
       if (!popup) {
-        // Fallback: redirect in same window
         window.location.href = authUrlStr;
       }
     } catch (err) {
@@ -202,8 +320,13 @@ export function useSpotify() {
   }, []);
 
   const disconnect = useCallback(() => {
+    if (playerRef.current) {
+      playerRef.current.disconnect();
+      playerRef.current = null;
+    }
     clearTokens();
     setIsConnected(false);
+    setSdkReady(false);
     setTracks([]);
     setCurrentTrack(null);
     setIsPlaying(false);
@@ -247,40 +370,81 @@ export function useSpotify() {
     }
   }, [getValidToken]);
 
-  const play = useCallback((track: SpotifyTrack) => {
-    if (track.preview_url) {
-      if (audioRef.current) {
-        audioRef.current.src = track.preview_url;
-        audioRef.current.play();
+  const play = useCallback(async (track: SpotifyTrack) => {
+    setCurrentTrack(track);
+
+    // Try SDK playback first (Premium users)
+    if (sdkReady && deviceIdRef.current) {
+      const token = await getValidToken();
+      if (token) {
+        try {
+          const res = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceIdRef.current}`, {
+            method: 'PUT',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ uris: [track.uri] }),
+          });
+          if (res.ok || res.status === 204) {
+            setIsPlaying(true);
+            setDuration(track.duration_ms / 1000);
+            // Trigger adaptive curation callback
+            onTrackPlayRef.current?.(track);
+            return;
+          }
+        } catch (err) {
+          console.error("SDK playback failed, falling back:", err);
+        }
       }
-      setCurrentTrack(track);
-      setIsPlaying(true);
-    } else {
-      // Open in Spotify app/web
-      window.open(`https://open.spotify.com/track/${track.id}`, '_blank');
-      toast.info("No preview available — opened in Spotify");
     }
-  }, []);
 
-  const pause = useCallback(() => {
-    audioRef.current?.pause();
+    // Fallback: use preview URL with audio element
+    if (track.preview_url && audioRef.current) {
+      audioRef.current.src = track.preview_url;
+      audioRef.current.play().catch(() => {});
+      setIsPlaying(true);
+      // Trigger adaptive curation callback
+      onTrackPlayRef.current?.(track);
+      return;
+    }
+
+    // Final fallback: search for similar tracks that have previews
+    toast.info("Playing preview not available for this track. Try another one or connect Spotify Premium for full playback.");
+  }, [sdkReady, getValidToken]);
+
+  const pause = useCallback(async () => {
+    if (sdkReady && playerRef.current) {
+      await playerRef.current.pause();
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
     setIsPlaying(false);
-  }, []);
+  }, [sdkReady]);
 
-  const togglePlay = useCallback(() => {
+  const togglePlay = useCallback(async () => {
     if (isPlaying) {
-      pause();
-    } else if (currentTrack?.preview_url && audioRef.current) {
-      audioRef.current.play();
-      setIsPlaying(true);
+      await pause();
+    } else {
+      if (sdkReady && playerRef.current) {
+        await playerRef.current.resume();
+        setIsPlaying(true);
+      } else if (currentTrack?.preview_url && audioRef.current) {
+        audioRef.current.play();
+        setIsPlaying(true);
+      }
     }
-  }, [isPlaying, currentTrack, pause]);
+  }, [isPlaying, currentTrack, pause, sdkReady]);
 
-  const seek = useCallback((time: number) => {
+  const seek = useCallback(async (time: number) => {
+    if (sdkReady && playerRef.current) {
+      await playerRef.current.seek(time * 1000);
+    }
     if (audioRef.current) {
       audioRef.current.currentTime = time;
     }
-  }, []);
+  }, [sdkReady]);
 
   return {
     isConnected,
@@ -292,6 +456,8 @@ export function useSpotify() {
     currentTime,
     duration,
     audioRef,
+    sdkReady,
+    isPremium,
     connect,
     disconnect,
     search,

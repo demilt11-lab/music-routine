@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Upload, Youtube, Headphones, Music } from "lucide-react";
 import { LocalMusicUpload } from "./LocalMusicUpload";
@@ -8,13 +9,22 @@ import { MusicPlayer } from "./MusicPlayer";
 import { useLocalMusic } from "@/hooks/useLocalMusic";
 import { useYouTubeMusic } from "@/hooks/useYouTubeMusic";
 import { useJamendo } from "@/hooks/useJamendo";
-import { useSpotify } from "@/hooks/useSpotify";
+import { useSpotify, type SpotifyTrack } from "@/hooks/useSpotify";
+import { toast } from "sonner";
 
 export function MusicTabs() {
   const localMusic = useLocalMusic();
   const youtubeMusic = useYouTubeMusic();
   const jamendo = useJamendo();
-  const spotify = useSpotify();
+
+  const handleTrackPlay = useCallback((track: SpotifyTrack) => {
+    toast.success(`Now playing: ${track.name}`, {
+      description: "Adaptive music engine will curate your playlist based on biometrics.",
+      duration: 3000,
+    });
+  }, []);
+
+  const spotify = useSpotify(handleTrackPlay);
 
   // Determine which player should be active
   const activeLocalTrack = localMusic.currentTrack;
@@ -50,6 +60,8 @@ export function MusicTabs() {
             tracks={spotify.tracks}
             currentTrack={spotify.currentTrack}
             isPlaying={spotify.isPlaying}
+            sdkReady={spotify.sdkReady}
+            isPremium={spotify.isPremium}
             onConnect={spotify.connect}
             onDisconnect={spotify.disconnect}
             onSearch={spotify.search}
