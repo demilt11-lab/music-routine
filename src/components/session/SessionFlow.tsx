@@ -238,7 +238,7 @@ export function SessionFlow() {
     }
   }, [biometricState.currentReading, biometricState.flowState, biometricState.isTracking, adaptiveMusic, eegMetrics]);
 
-  // Update current song info for adaptive music
+  // Update current song info for adaptive music (Jamendo)
   useEffect(() => {
     if (jamendo.currentTrack) {
       adaptiveMusic.setCurrentSong({
@@ -247,6 +247,39 @@ export function SessionFlow() {
       });
     }
   }, [jamendo.currentTrack, adaptiveMusic]);
+
+  // Listen for Spotify track plays from MusicTabs and feed into adaptive engine
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail || step !== "active") return;
+
+      // Update the adaptive music engine with the Spotify track
+      adaptiveMusic.setCurrentSong({
+        title: detail.title,
+        artist: detail.artist,
+      });
+
+      // Trigger an immediate recommendation based on current biometrics
+      if (biometricState.isTracking) {
+        adaptiveMusic.getImmediateRecommendation();
+      }
+
+      // Track as a music adaptation for session summary
+      setMusicAdaptations(prev => [...prev, {
+        timestamp: new Date(),
+        trackName: detail.title,
+        artist: detail.artist,
+        tempo: adaptiveMusic.state.currentRecommendation?.targetTempo || 0,
+        energy: adaptiveMusic.state.currentRecommendation?.targetEnergy || 0,
+        reason: "User played Spotify track — adaptive curation triggered",
+        triggerType: 'manual' as const,
+      }]);
+    };
+
+    window.addEventListener("spotify-track-play", handler);
+    return () => window.removeEventListener("spotify-track-play", handler);
+  }, [step, biometricState.isTracking, adaptiveMusic]);
 
   const formatTime = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600);

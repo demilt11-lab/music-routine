@@ -22,6 +22,10 @@ export function MusicTabs() {
       description: "Adaptive music engine will curate your playlist based on biometrics.",
       duration: 3000,
     });
+    // Dispatch custom event so SessionFlow can pick it up
+    window.dispatchEvent(new CustomEvent("spotify-track-play", {
+      detail: { title: track.name, artist: track.artist, uri: track.uri, id: track.id },
+    }));
   }, []);
 
   const spotify = useSpotify(handleTrackPlay);
