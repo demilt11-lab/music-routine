@@ -8,7 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { ArrowLeft, ChevronRight, Loader2, Music, Save, ThumbsUp, User } from "lucide-react";
+import { ArrowLeft, Bell, ChevronRight, Loader2, Music, Save, ThumbsUp, User } from "lucide-react";
+import NotificationSettings from "@/components/notifications/NotificationSettings";
 import type { User as SupaUser } from "@supabase/supabase-js";
 
 interface Preferences {
@@ -189,6 +190,20 @@ const Settings = () => {
                 onCheckedChange={(v) => setPreferences((p) => ({ ...p, autoplay: v }))}
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Push Notifications */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="w-5 h-5 text-primary" />
+              Notifications
+            </CardTitle>
+            <CardDescription>Configure push notifications and alerts</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <NotificationSettings />
           </CardContent>
         </Card>
 
