@@ -59,13 +59,13 @@ const Navbar = ({ onLogin, onRegister }: NavbarProps) => {
       {isOpen && (
         <div className="md:hidden border-t border-border/50 glass">
           <div className="container mx-auto px-6 py-4 space-y-4">
-            <a href="#features" className="block text-muted-foreground hover:text-foreground transition-colors py-2">
+            <a href="#features" onClick={() => setIsOpen(false)} className="block text-muted-foreground hover:text-foreground transition-colors py-2">
               Features
             </a>
-            <a href="#how-it-works" className="block text-muted-foreground hover:text-foreground transition-colors py-2">
+            <a href="#how-it-works" onClick={() => setIsOpen(false)} className="block text-muted-foreground hover:text-foreground transition-colors py-2">
               How It Works
             </a>
-            <a href="#pricing" className="block text-muted-foreground hover:text-foreground transition-colors py-2">
+            <a href="#pricing" onClick={() => setIsOpen(false)} className="block text-muted-foreground hover:text-foreground transition-colors py-2">
               Pricing
             </a>
             <div className="flex flex-col gap-2 pt-4 border-t border-border/50">
