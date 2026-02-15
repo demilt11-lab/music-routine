@@ -46,7 +46,7 @@ const tiers = [
 
 const Pricing = ({ onGetStarted }: PricingProps) => {
   return (
-    <section className="py-24 px-4 relative">
+    <section id="pricing" className="py-24 px-4 relative">
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent pointer-events-none" />
       <div className="max-w-5xl mx-auto relative z-10">
         <div className="text-center mb-16">
