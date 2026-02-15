@@ -138,6 +138,8 @@ export function BiometricMusicMapper({
       stressLevel > 60 ? "decreasing" : stressLevel < 30 ? "increasing" : "stable";
     const focusInfluence: MappingLink["influence"] =
       focusScore > 70 ? "stable" : focusScore < 40 ? "increasing" : "stable";
+    const relaxInfluence: MappingLink["influence"] =
+      relaxationScore > 70 ? "decreasing" : relaxationScore < 30 ? "increasing" : "stable";
 
     return [
       {
@@ -170,8 +172,18 @@ export function BiometricMusicMapper({
         influence: focusInfluence,
         strength: Math.min(100, Math.abs(focusScore - 60) * 2),
       },
+      {
+        label: "Relaxation",
+        bioValue: relaxationScore,
+        bioIcon: <Sparkles className="w-4 h-4" />,
+        bioColor: "text-teal-500",
+        musicParam: "Energy",
+        musicValue: `${Math.round(energy * 100)}%`,
+        influence: relaxInfluence,
+        strength: Math.min(100, Math.abs(relaxationScore - 50) * 2),
+      },
     ];
-  }, [heartRate, stressLevel, focusScore, targetTempo, targetEnergy]);
+  }, [heartRate, stressLevel, focusScore, relaxationScore, targetTempo, targetEnergy]);
 
   const flowScore = useMemo(() => {
     return Math.round((focusScore + relaxationScore - stressLevel / 2) / 2);
@@ -206,23 +218,25 @@ export function BiometricMusicMapper({
 
   // SVG layout constants
   const svgW = 360;
-  const svgH = 160;
+  const svgH = 200;
   const bioX = 60;
   const musicX = 300;
   const bioNodes = [
     { y: 30, label: `${heartRate}`, sub: "HR", icon: "♥", color: "hsl(0, 70%, 60%)" },
-    { y: 80, label: `${stressLevel}%`, sub: "Stress", icon: "⚡", color: "hsl(30, 80%, 55%)" },
-    { y: 130, label: `${focusScore}%`, sub: "Focus", icon: "🧠", color: "hsl(270, 60%, 55%)" },
+    { y: 75, label: `${stressLevel}%`, sub: "Stress", icon: "⚡", color: "hsl(30, 80%, 55%)" },
+    { y: 120, label: `${focusScore}%`, sub: "Focus", icon: "🧠", color: "hsl(270, 60%, 55%)" },
+    { y: 165, label: `${relaxationScore}%`, sub: "Relax", icon: "🌿", color: "hsl(170, 55%, 45%)" },
   ];
   const musicNodes = [
-    { y: 55, label: targetTempo ? `${targetTempo}` : "—", sub: "BPM", color: "hsl(var(--primary))" },
-    { y: 105, label: targetEnergy != null ? `${Math.round(targetEnergy * 100)}%` : "—", sub: "Energy", color: "hsl(40, 80%, 55%)" },
+    { y: 52, label: targetTempo ? `${targetTempo}` : "—", sub: "BPM", color: "hsl(var(--primary))" },
+    { y: 142, label: targetEnergy != null ? `${Math.round(targetEnergy * 100)}%` : "—", sub: "Energy", color: "hsl(40, 80%, 55%)" },
   ];
   // Connection map: bio index -> music index
   const connections = [
     { bioIdx: 0, musicIdx: 0 }, // HR -> Tempo
     { bioIdx: 1, musicIdx: 1 }, // Stress -> Energy
     { bioIdx: 2, musicIdx: 0 }, // Focus -> Tempo
+    { bioIdx: 3, musicIdx: 1 }, // Relaxation -> Energy
   ];
 
   return (
