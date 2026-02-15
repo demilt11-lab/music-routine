@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, Music, Save, User } from "lucide-react";
+import { ArrowLeft, ChevronRight, Loader2, Music, Save, ThumbsUp, User } from "lucide-react";
 import type { User as SupaUser } from "@supabase/supabase-js";
 
 interface Preferences {
@@ -189,6 +189,25 @@ const Settings = () => {
                 onCheckedChange={(v) => setPreferences((p) => ({ ...p, autoplay: v }))}
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Track Feedback */}
+        <Card
+          className="cursor-pointer hover:border-primary/30 transition-colors"
+          onClick={() => navigate("/feedback")}
+        >
+          <CardContent className="flex items-center gap-4 py-5">
+            <div className="rounded-full bg-accent/10 p-2">
+              <ThumbsUp className="w-5 h-5 text-accent" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-foreground">Track Preferences</p>
+              <p className="text-sm text-muted-foreground">
+                View and manage your music feedback history
+              </p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </CardContent>
         </Card>
 
