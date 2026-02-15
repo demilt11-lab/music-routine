@@ -10,7 +10,7 @@ const Footer = () => {
             <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
               <Music2 className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold">Routine</span>
+            <span className="text-xl font-bold">BioMusic</span>
           </div>
 
           {/* Links */}
@@ -32,7 +32,7 @@ const Footer = () => {
         </div>
 
         <div className="mt-8 pt-8 border-t border-border/50 text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} Routine Music. All rights reserved.
+          © {new Date().getFullYear()} BioMusic. All rights reserved.
         </div>
       </div>
     </footer>
