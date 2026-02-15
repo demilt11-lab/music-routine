@@ -10,6 +10,7 @@ import SessionHistory from "./pages/SessionHistory";
 import WeeklyInsights from "./pages/WeeklyInsights";
 import MonthlyProgress from "./pages/MonthlyProgress";
 import Settings from "./pages/Settings";
+import TrackFeedback from "./pages/TrackFeedback";
 import NotFound from "./pages/NotFound";
 import { MobileNavBar } from "./components/mobile/MobileNavBar";
 
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/insights" element={<WeeklyInsights />} />
             <Route path="/monthly" element={<MonthlyProgress />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/feedback" element={<TrackFeedback />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <MobileNavBar />
