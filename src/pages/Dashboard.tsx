@@ -158,7 +158,7 @@ const Dashboard = () => {
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <Music className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="font-semibold text-lg">MindTune</span>
+            <span className="font-semibold text-lg">BioMusic</span>
           </div>
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" onClick={() => navigate("/insights")}>

@@ -17,7 +17,7 @@ interface Badge {
   target: number;
 }
 
-const STORAGE_KEY = "mindtune_unlocked_badges";
+const STORAGE_KEY = "biomusic_unlocked_badges";
 
 function computeStreak(sessions: { started_at: string }[]): number {
   if (!sessions.length) return 0;
@@ -121,18 +121,18 @@ export const AchievementBadges = () => {
     const unlockedBadges = badges.filter((b) => b.unlocked);
     const total = badges.length;
     const lines = [
-      `🏆 My MindTune Achievements (${unlockedBadges.length}/${total})`,
+      `🏆 My BioMusic Achievements (${unlockedBadges.length}/${total})`,
       "",
       ...unlockedBadges.map((b) => `${b.emoji} ${b.name} — ${b.description}`),
       "",
-      "🎧 Track your focus with music at MindTune!",
+      "🎧 Track your focus with music at BioMusic!",
     ];
     const text = lines.join("\n");
 
     // Try native share first, fallback to clipboard
     if (navigator.share) {
       try {
-        await navigator.share({ title: "My MindTune Achievements", text });
+        await navigator.share({ title: "My BioMusic Achievements", text });
         return;
       } catch {
         // User cancelled or not supported, fall through to clipboard
