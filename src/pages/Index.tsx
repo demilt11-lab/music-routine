@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import Features from "@/components/Features";
 import HowItWorks from "@/components/HowItWorks";
+import Pricing from "@/components/Pricing";
 import Footer from "@/components/Footer";
 import AuthModal from "@/components/AuthModal";
 import { MobileOnboarding } from "@/components/mobile/MobileOnboarding";
@@ -56,6 +57,7 @@ const Index = () => {
       <Hero onGetStarted={handleRegister} />
       <Features />
       <HowItWorks />
+      <Pricing onGetStarted={handleRegister} />
       <Footer />
       <AuthModal
         isOpen={isAuthModalOpen}
