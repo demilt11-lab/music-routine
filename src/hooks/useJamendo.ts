@@ -1,9 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { toast } from "sonner";
 
-// Jamendo provides free Creative Commons music with a free API
-// No authentication required for basic usage (80 requests/IP/minute)
-const JAMENDO_CLIENT_ID = "b6747d04"; // Public demo client ID
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 export interface JamendoTrack {
   id: string;
@@ -60,10 +58,10 @@ export function useJamendo(): UseJamendoReturn {
   const audioRef = useRef<HTMLAudioElement>(null);
   const onTrackEndRef = useRef<(() => void) | null>(null);
 
+  // Use edge function proxy to avoid CORS issues with Jamendo API
   const buildUrl = (endpoint: string, params: Record<string, string | number | undefined>) => {
-    const url = new URL(`https://api.jamendo.com/v3.0/${endpoint}`);
-    url.searchParams.set("client_id", JAMENDO_CLIENT_ID);
-    url.searchParams.set("format", "json");
+    const url = new URL(`${SUPABASE_URL}/functions/v1/jamendo-proxy`);
+    url.searchParams.set("endpoint", endpoint);
     
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined) {
