@@ -12,6 +12,7 @@ import MonthlyProgress from "./pages/MonthlyProgress";
 import Settings from "./pages/Settings";
 import TrackFeedback from "./pages/TrackFeedback";
 import AppListing from "./pages/AppListing";
+import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 import { MobileNavBar } from "./components/mobile/MobileNavBar";
 import ScrollToTop from "./components/ScrollToTop";
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/settings" element={<Settings />} />
             <Route path="/feedback" element={<TrackFeedback />} />
             <Route path="/app" element={<AppListing />} />
+            <Route path="/install" element={<Install />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <MobileNavBar />
