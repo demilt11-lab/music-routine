@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.jamendo-proxy]
 verify_jwt = false
+
+[functions.get-vapid-key]
+verify_jwt = false
+
+[functions.send-push-notification]
+verify_jwt = false
