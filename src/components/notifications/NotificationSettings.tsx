@@ -1,4 +1,4 @@
-import { Bell, BellOff, Clock, Brain } from "lucide-react";
+import { Bell, BellOff, Clock, Brain, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ import {
   usePushNotifications,
   useLocalNotifications,
 } from "@/hooks/usePushNotifications";
+import { useWebPush } from "@/hooks/useWebPush";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -20,6 +21,7 @@ const NotificationSettings = () => {
   const { isSupported, isRegistered, requestPermission } =
     usePushNotifications();
   const { scheduleSessionReminder } = useLocalNotifications();
+  const webPush = useWebPush();
   const [sessionReminders, setSessionReminders] = useState(true);
   const [flowAlerts, setFlowAlerts] = useState(true);
   const [reminderTime, setReminderTime] = useState("15");
@@ -41,6 +43,7 @@ const NotificationSettings = () => {
 
   return (
     <div className="space-y-6">
+      {/* Native push (Capacitor) */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {isRegistered ? (
@@ -61,12 +64,60 @@ const NotificationSettings = () => {
             </p>
           </div>
         </div>
-        {!isRegistered && (
+        {!isRegistered && isSupported && (
           <Button size="sm" variant="outline" onClick={handleEnable}>
             Enable
           </Button>
         )}
       </div>
+
+      {/* Web Push */}
+      {webPush.isSupported && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Globe className="h-5 w-5 text-primary" />
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                Browser Notifications
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {webPush.isSubscribed
+                  ? "Enabled — receive alerts even when the tab is closed"
+                  : "Get notified even when BioMusic isn't open"}
+              </p>
+            </div>
+          </div>
+          {webPush.isSubscribed ? (
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={webPush.sendTestNotification}
+                disabled={webPush.isLoading}
+              >
+                Test
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={webPush.unsubscribe}
+                disabled={webPush.isLoading}
+              >
+                Disable
+              </Button>
+            </div>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={webPush.subscribe}
+              disabled={webPush.isLoading}
+            >
+              {webPush.isLoading ? "…" : "Enable"}
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="space-y-4 border-t border-border pt-4">
         <div className="flex items-center justify-between">

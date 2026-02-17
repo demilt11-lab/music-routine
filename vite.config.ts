@@ -19,7 +19,10 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         navigateFallbackDenylist: [/^\/~oauth/],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,jpg,webp,woff,woff2}"],
+        additionalManifestEntries: [],
       },
+      injectManifest: undefined,
+      strategies: "generateSW",
       manifest: {
         name: "BioMusic - Biometric-Driven Music",
         short_name: "BioMusic",
