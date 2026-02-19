@@ -19,14 +19,9 @@ import { SmartScheduler } from "@/components/scheduling/SmartScheduler";
 import { RecentSessionWidget } from "@/components/dashboard/RecentSessionWidget";
 import { AchievementBadges } from "@/components/dashboard/AchievementBadges";
 import { WeeklyRecap } from "@/components/dashboard/WeeklyRecap";
+import { useCurrentUser, useActivityTypes, useUserProfile, useRecentPlaylists } from "@/hooks/useDashboardData";
+import { useQueryClient } from "@tanstack/react-query";
 import type { User } from "@supabase/supabase-js";
-
-interface ActivityType {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-}
 
 interface GeneratedPlaylist {
   id: string;
@@ -47,24 +42,23 @@ const activityIcons: Record<string, React.ReactNode> = {
 };
 
 const Dashboard = () => {
-  const [user, setUser] = useState<User | null>(null);
-  const [displayName, setDisplayName] = useState<string | null>(null);
-  const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
-  const [playlists, setPlaylists] = useState<GeneratedPlaylist[]>([]);
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const { data: user, isLoading: userLoading } = useCurrentUser();
+  const { data: activityTypes = [] } = useActivityTypes();
+  const { data: profile } = useUserProfile(user?.id);
+  const { data: playlists = [] } = useRecentPlaylists(user?.id);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
       if (!session?.user) {
         navigate("/auth");
       }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
       if (!session?.user) {
         navigate("/auth");
       }
@@ -72,39 +66,6 @@ const Dashboard = () => {
 
     return () => subscription.unsubscribe();
   }, [navigate]);
-
-  useEffect(() => {
-    if (user) {
-      fetchData();
-    }
-  }, [user]);
-
-  const fetchData = async () => {
-    setIsLoading(true);
-    try {
-      const [activitiesRes, playlistsRes, profileRes] = await Promise.all([
-        supabase.from("activity_types").select("*"),
-        supabase
-          .from("generated_playlists")
-          .select("*, activity_types(name)")
-          .order("created_at", { ascending: false })
-          .limit(5),
-        supabase
-          .from("profiles")
-          .select("display_name")
-          .eq("id", user!.id)
-          .single(),
-      ]);
-
-      if (activitiesRes.data) setActivityTypes(activitiesRes.data);
-      if (playlistsRes.data) setPlaylists(playlistsRes.data as GeneratedPlaylist[]);
-      if (profileRes.data) setDisplayName(profileRes.data.display_name);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleGeneratePlaylist = async (activityName: string) => {
     setGeneratingFor(activityName);
@@ -117,16 +78,11 @@ const Dashboard = () => {
         },
       });
 
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      if (data?.error) {
-        throw new Error(data.error);
-      }
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
 
       toast.success(`Generated "${data.playlist.playlistName}"!`);
-      fetchData();
+      queryClient.invalidateQueries({ queryKey: ["recent-playlists"] });
     } catch (error) {
       console.error("Error generating playlist:", error);
       toast.error(error instanceof Error ? error.message : "Failed to generate playlist");
@@ -141,13 +97,15 @@ const Dashboard = () => {
     navigate("/");
   };
 
-  if (isLoading) {
+  if (userLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
+
+  const displayName = profile?.display_name;
 
   return (
     <div className="min-h-screen bg-background">
@@ -295,7 +253,7 @@ const Dashboard = () => {
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {playlists.map((playlist) => (
+              {(playlists as GeneratedPlaylist[]).map((playlist) => (
                 <Card key={playlist.id} className="hover:shadow-md transition-shadow">
                   <CardHeader>
                     <div className="flex items-start justify-between">
