@@ -16,6 +16,7 @@ import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 import { MobileNavBar } from "./components/mobile/MobileNavBar";
 import ScrollToTop from "./components/ScrollToTop";
+import { ConnectionStatusBanner } from "./components/ConnectionStatusBanner";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +26,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <ConnectionStatusBanner />
         <ScrollToTop />
         <div className="min-h-screen pb-16 md:pb-0">
           <Routes>
