@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { differenceInCalendarDays } from "date-fns";
 import { Trophy, Share2, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
+import { useCurrentUser, useUserSessions } from "@/hooks/useDashboardData";
 
 interface Badge {
   id: string;
@@ -23,7 +23,6 @@ function computeStreak(sessions: { started_at: string }[]): number {
   if (!sessions.length) return 0;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
   const days = Array.from(
     new Set(
       sessions.map((s) => {
@@ -33,10 +32,8 @@ function computeStreak(sessions: { started_at: string }[]): number {
       })
     )
   ).sort((a, b) => b - a);
-
   const diff = differenceInCalendarDays(today, new Date(days[0]));
   if (diff > 1) return 0;
-
   let streak = 1;
   for (let i = 1; i < days.length; i++) {
     if (differenceInCalendarDays(new Date(days[i - 1]), new Date(days[i])) === 1) {
@@ -61,61 +58,40 @@ function buildBadges(total: number, streak: number): Badge[] {
 }
 
 export const AchievementBadges = () => {
-  const [badges, setBadges] = useState<Badge[]>([]);
-  const [newBadgeIds, setNewBadgeIds] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const toastsFired = useRef(false);
 
-  useEffect(() => {
-    fetchAchievements();
-  }, []);
+  const { data: user } = useCurrentUser();
+  const { data: sessions, isLoading } = useUserSessions(user?.id);
 
-  const fetchAchievements = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  const { badges, newBadgeIds } = useMemo(() => {
+    const total = sessions?.length || 0;
+    const streak = sessions ? computeStreak(sessions) : 0;
+    const computed = buildBadges(total, streak);
 
-      const { data: sessions } = await supabase
-        .from("listening_sessions")
-        .select("started_at")
-        .eq("user_id", user.id)
-        .order("started_at", { ascending: false });
+    const prevUnlocked: string[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    const currentUnlocked = computed.filter((b) => b.unlocked).map((b) => b.id);
+    const freshlyUnlocked = currentUnlocked.filter((id) => !prevUnlocked.includes(id));
 
-      const total = sessions?.length || 0;
-      const streak = sessions ? computeStreak(sessions) : 0;
-      const computed = buildBadges(total, streak);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(currentUnlocked));
 
-      // Detect newly unlocked badges
-      const prevUnlocked: string[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-      const currentUnlocked = computed.filter((b) => b.unlocked).map((b) => b.id);
-      const freshlyUnlocked = currentUnlocked.filter((id) => !prevUnlocked.includes(id));
-
-      setNewBadgeIds(new Set(freshlyUnlocked));
-      setBadges(computed);
-
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(currentUnlocked));
-
-      if (!toastsFired.current && freshlyUnlocked.length > 0) {
-        toastsFired.current = true;
-        freshlyUnlocked.forEach((id, i) => {
-          const badge = computed.find((b) => b.id === id);
-          if (badge) {
-            setTimeout(() => {
-              toast.success(`${badge.emoji} Badge Unlocked: ${badge.name}!`, {
-                description: badge.description,
-                duration: 5000,
-              });
-            }, i * 800);
-          }
-        });
-      }
-    } catch (err) {
-      console.error("Error fetching achievements:", err);
-    } finally {
-      setLoading(false);
+    if (!toastsFired.current && freshlyUnlocked.length > 0) {
+      toastsFired.current = true;
+      freshlyUnlocked.forEach((id, i) => {
+        const badge = computed.find((b) => b.id === id);
+        if (badge) {
+          setTimeout(() => {
+            toast.success(`${badge.emoji} Badge Unlocked: ${badge.name}!`, {
+              description: badge.description,
+              duration: 5000,
+            });
+          }, i * 800);
+        }
+      });
     }
-  };
+
+    return { badges: computed, newBadgeIds: new Set(freshlyUnlocked) };
+  }, [sessions]);
 
   const handleShare = async () => {
     const unlockedBadges = badges.filter((b) => b.unlocked);
@@ -129,14 +105,11 @@ export const AchievementBadges = () => {
     ];
     const text = lines.join("\n");
 
-    // Try native share first, fallback to clipboard
     if (navigator.share) {
       try {
         await navigator.share({ title: "My BioMusic Achievements", text });
         return;
-      } catch {
-        // User cancelled or not supported, fall through to clipboard
-      }
+      } catch { /* fall through */ }
     }
 
     try {
@@ -149,7 +122,7 @@ export const AchievementBadges = () => {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <Card className="animate-pulse">
         <CardHeader><div className="h-6 bg-muted rounded w-40" /></CardHeader>
@@ -169,12 +142,7 @@ export const AchievementBadges = () => {
           <span className="text-sm font-normal text-muted-foreground">
             {unlocked}/{badges.length}
           </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="ml-auto gap-1.5"
-            onClick={handleShare}
-          >
+          <Button variant="ghost" size="sm" className="ml-auto gap-1.5" onClick={handleShare}>
             {copied ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
             {copied ? "Copied" : "Share"}
           </Button>
@@ -202,19 +170,14 @@ export const AchievementBadges = () => {
                 <p className={`text-[10px] font-medium leading-tight mb-1 ${!badge.unlocked ? "text-muted-foreground" : ""}`}>
                   {badge.name}
                 </p>
-
                 {badge.unlocked ? (
                   isNew && (
-                    <span className="text-[8px] font-bold uppercase tracking-widest text-primary">
-                      New!
-                    </span>
+                    <span className="text-[8px] font-bold uppercase tracking-widest text-primary">New!</span>
                   )
                 ) : (
                   <div className="w-full mt-1 space-y-0.5">
                     <Progress value={progressPct} className="h-1" />
-                    <p className="text-[8px] text-muted-foreground">
-                      {badge.current}/{badge.target}
-                    </p>
+                    <p className="text-[8px] text-muted-foreground">{badge.current}/{badge.target}</p>
                   </div>
                 )}
               </div>

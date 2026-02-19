@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { differenceInCalendarDays, startOfWeek, endOfWeek, format } from "date-fns";
 import { Bell, X, TrendingUp, TrendingDown, Minus, Flame, Target, Music, Sparkles, Lightbulb } from "lucide-react";
+import { useCurrentUser, useUserSessions, useActivityTypes } from "@/hooks/useDashboardData";
 
 const WEEKLY_QUOTES = [
   { text: "Music gives a soul to the universe, wings to the mind, flight to the imagination.", author: "Plato" },
@@ -54,16 +53,13 @@ function getDailyTip(): string {
 
 const RECAP_DISMISSED_KEY = "biomusic_recap_dismissed";
 
-interface WeeklyStats {
-  sessionsThisWeek: number;
-  sessionsLastWeek: number;
-  currentStreak: number;
-  totalSessions: number;
-  topActivity: string | null;
-  newBadgesThisWeek: string[];
-  weekStart: Date;
-  weekEnd: Date;
-}
+const BADGE_THRESHOLDS = [
+  { id: "first", name: "First Note", emoji: "🎵", target: 1 },
+  { id: "five", name: "Getting Started", emoji: "🎶", target: 5 },
+  { id: "ten", name: "On Fire", emoji: "🔥", target: 10 },
+  { id: "twentyfive", name: "Star Listener", emoji: "⭐", target: 25 },
+  { id: "fifty", name: "Diamond Ears", emoji: "💎", target: 50 },
+];
 
 function computeStreak(sessions: { started_at: string }[]): number {
   if (!sessions.length) return 0;
@@ -90,108 +86,71 @@ function computeStreak(sessions: { started_at: string }[]): number {
   return streak;
 }
 
-const BADGE_THRESHOLDS = [
-  { id: "first", name: "First Note", emoji: "🎵", target: 1 },
-  { id: "five", name: "Getting Started", emoji: "🎶", target: 5 },
-  { id: "ten", name: "On Fire", emoji: "🔥", target: 10 },
-  { id: "twentyfive", name: "Star Listener", emoji: "⭐", target: 25 },
-  { id: "fifty", name: "Diamond Ears", emoji: "💎", target: 50 },
-];
-
 export const WeeklyRecap = () => {
-  const [stats, setStats] = useState<WeeklyStats | null>(null);
-  const [dismissed, setDismissed] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
+  const [dismissed, setDismissed] = useState(() => {
     const dismissedDate = localStorage.getItem(RECAP_DISMISSED_KEY);
     if (dismissedDate) {
       const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-      if (new Date(dismissedDate) >= weekStart) {
-        setDismissed(true);
-        setLoading(false);
-        return;
-      }
+      return new Date(dismissedDate) >= weekStart;
     }
-    fetchWeeklyStats();
-  }, []);
+    return false;
+  });
 
-  const fetchWeeklyStats = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  const { data: user } = useCurrentUser();
+  const { data: allSessions, isLoading } = useUserSessions(user?.id);
+  const { data: activityTypes } = useActivityTypes();
 
-      const now = new Date();
-      const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-      const lastWeekStart = new Date(weekStart);
-      lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  const stats = useMemo(() => {
+    if (!allSessions) return null;
 
-      const { data: allSessions } = await supabase
-        .from("listening_sessions")
-        .select("started_at, activity_type_id")
-        .eq("user_id", user.id)
-        .order("started_at", { ascending: false });
+    const now = new Date();
+    const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+    const lastWeekStart = new Date(weekStart);
+    lastWeekStart.setDate(lastWeekStart.getDate() - 7);
 
-      if (!allSessions) {
-        setLoading(false);
-        return;
-      }
+    const thisWeekSessions = allSessions.filter(
+      (s) => new Date(s.started_at) >= weekStart && new Date(s.started_at) <= weekEnd
+    );
+    const lastWeekSessions = allSessions.filter(
+      (s) => new Date(s.started_at) >= lastWeekStart && new Date(s.started_at) < weekStart
+    );
 
-      const thisWeekSessions = allSessions.filter(
-        (s) => new Date(s.started_at) >= weekStart && new Date(s.started_at) <= weekEnd
-      );
-      const lastWeekSessions = allSessions.filter(
-        (s) => new Date(s.started_at) >= lastWeekStart && new Date(s.started_at) < weekStart
-      );
+    // Top activity this week
+    const activityCounts: Record<string, number> = {};
+    thisWeekSessions.forEach((s) => {
+      activityCounts[s.activity_type_id] = (activityCounts[s.activity_type_id] || 0) + 1;
+    });
+    const topActivityId = Object.entries(activityCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+    const topActivity = topActivityId
+      ? activityTypes?.find((a) => a.id === topActivityId)?.name || null
+      : null;
 
-      // Top activity this week
-      const activityCounts: Record<string, number> = {};
-      thisWeekSessions.forEach((s) => {
-        activityCounts[s.activity_type_id] = (activityCounts[s.activity_type_id] || 0) + 1;
-      });
-      const topActivityId = Object.entries(activityCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+    // Check for badges earned this week
+    const totalBeforeThisWeek = allSessions.length - thisWeekSessions.length;
+    const totalNow = allSessions.length;
+    const newBadges = BADGE_THRESHOLDS.filter(
+      (b) => totalBeforeThisWeek < b.target && totalNow >= b.target
+    ).map((b) => `${b.emoji} ${b.name}`);
 
-      let topActivity: string | null = null;
-      if (topActivityId) {
-        const { data: activity } = await supabase
-          .from("activity_types")
-          .select("name")
-          .eq("id", topActivityId)
-          .single();
-        topActivity = activity?.name || null;
-      }
-
-      // Check for badges earned this week
-      const totalBeforeThisWeek = allSessions.length - thisWeekSessions.length;
-      const totalNow = allSessions.length;
-      const newBadges = BADGE_THRESHOLDS.filter(
-        (b) => totalBeforeThisWeek < b.target && totalNow >= b.target
-      ).map((b) => `${b.emoji} ${b.name}`);
-
-      setStats({
-        sessionsThisWeek: thisWeekSessions.length,
-        sessionsLastWeek: lastWeekSessions.length,
-        currentStreak: computeStreak(allSessions),
-        totalSessions: allSessions.length,
-        topActivity,
-        newBadgesThisWeek: newBadges,
-        weekStart,
-        weekEnd,
-      });
-    } catch (err) {
-      console.error("Error fetching weekly stats:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    return {
+      sessionsThisWeek: thisWeekSessions.length,
+      sessionsLastWeek: lastWeekSessions.length,
+      currentStreak: computeStreak(allSessions),
+      totalSessions: allSessions.length,
+      topActivity,
+      newBadgesThisWeek: newBadges,
+      weekStart,
+      weekEnd,
+    };
+  }, [allSessions, activityTypes]);
 
   const handleDismiss = () => {
     setDismissed(true);
     localStorage.setItem(RECAP_DISMISSED_KEY, new Date().toISOString());
   };
 
-  if (loading || dismissed || !stats) return null;
+  if (isLoading || dismissed || !stats) return null;
   if (stats.sessionsThisWeek === 0 && stats.sessionsLastWeek === 0) return null;
 
   const trend = stats.sessionsThisWeek - stats.sessionsLastWeek;
@@ -222,7 +181,6 @@ export const WeeklyRecap = () => {
 
       <CardContent>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {/* Sessions this week */}
           <div className="space-y-1">
             <div className="flex items-center gap-1.5">
               <Target className="w-4 h-4 text-primary" />
@@ -235,7 +193,6 @@ export const WeeklyRecap = () => {
             </div>
           </div>
 
-          {/* Current streak */}
           <div className="space-y-1">
             <div className="flex items-center gap-1.5">
               <Flame className="w-4 h-4 text-destructive" />
@@ -245,7 +202,6 @@ export const WeeklyRecap = () => {
             <p className="text-xs text-muted-foreground">day{stats.currentStreak !== 1 ? "s" : ""} in a row</p>
           </div>
 
-          {/* Top activity */}
           <div className="space-y-1">
             <div className="flex items-center gap-1.5">
               <Music className="w-4 h-4 text-primary" />
@@ -255,7 +211,6 @@ export const WeeklyRecap = () => {
             <p className="text-xs text-muted-foreground">most played</p>
           </div>
 
-          {/* Total progress */}
           <div className="space-y-1">
             <div className="flex items-center gap-1.5">
               <TrendingUp className="w-4 h-4 text-primary" />
@@ -266,16 +221,12 @@ export const WeeklyRecap = () => {
           </div>
         </div>
 
-        {/* New badges earned this week */}
         {stats.newBadgesThisWeek.length > 0 && (
           <div className="mt-4 pt-3 border-t border-border">
             <p className="text-sm font-medium mb-1.5">🎉 Badges earned this week:</p>
             <div className="flex flex-wrap gap-2">
               {stats.newBadgesThisWeek.map((badge, i) => (
-                <span
-                  key={i}
-                  className="text-sm bg-primary/10 text-primary px-2.5 py-1 rounded-full"
-                >
+                <span key={i} className="text-sm bg-primary/10 text-primary px-2.5 py-1 rounded-full">
                   {badge}
                 </span>
               ))}
@@ -283,7 +234,6 @@ export const WeeklyRecap = () => {
           </div>
         )}
 
-        {/* Daily tip & Weekly quote */}
         <div className="mt-4 pt-3 border-t border-border space-y-3">
           <div className="flex items-start gap-2">
             <Lightbulb className="w-4 h-4 text-accent-foreground mt-0.5 shrink-0" />
