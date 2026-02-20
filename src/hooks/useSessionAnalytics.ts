@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useCurrentUser } from "@/hooks/useDashboardData";
 
 export interface SongPerformance {
   songId: string;
@@ -51,13 +52,13 @@ interface UseSessionAnalyticsReturn {
 }
 
 export function useSessionAnalytics(): UseSessionAnalyticsReturn {
+  const { data: user } = useCurrentUser();
   const [activityInsights, setActivityInsights] = useState<ActivityInsight[]>([]);
   const [overallInsights, setOverallInsights] = useState<OverallInsights | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const calculateActivityInsights = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       setError("Not authenticated");
       return;
@@ -279,7 +280,7 @@ export function useSessionAnalytics(): UseSessionAnalyticsReturn {
       optimalHeartRateZone: { min: 65, max: 85 },
       peakFocusHours: [9, 10, 14, 15],
     });
-  }, []);
+  }, [user]);
 
   const refreshAnalytics = useCallback(async () => {
     setIsLoading(true);
@@ -289,8 +290,8 @@ export function useSessionAnalytics(): UseSessionAnalyticsReturn {
   }, [calculateActivityInsights]);
 
   useEffect(() => {
-    refreshAnalytics();
-  }, [refreshAnalytics]);
+    if (user) refreshAnalytics();
+  }, [refreshAnalytics, user]);
 
   return {
     activityInsights,
