@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useCurrentUser } from "@/hooks/useDashboardData";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -88,6 +89,7 @@ function getCorrelationIndicator(value: number) {
 }
 
 export function PersonalizedInsights() {
+  const { data: user } = useCurrentUser();
   const [profiles, setProfiles] = useState<ActivityMusicProfile[]>([]);
   const [summary, setSummary] = useState<InsightsSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -95,7 +97,6 @@ export function PersonalizedInsights() {
   const [selectedActivity, setSelectedActivity] = useState<string | null>(null);
 
   const calculateInsights = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       setError("Not authenticated");
       return;
@@ -356,7 +357,7 @@ export function PersonalizedInsights() {
       
       setSelectedActivity(calculatedProfiles[0]?.activityId || null);
     }
-  }, []);
+  }, [user]);
 
   const refresh = useCallback(async () => {
     setIsLoading(true);
@@ -366,8 +367,8 @@ export function PersonalizedInsights() {
   }, [calculateInsights]);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    if (user) refresh();
+  }, [refresh, user]);
 
   if (isLoading) {
     return (

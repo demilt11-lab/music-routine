@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Activity, Brain, Heart, Music, TrendingUp } from "lucide-react";
+import { useCurrentUser } from "@/hooks/useDashboardData";
 
 interface BiometricReading {
   id: string;
@@ -56,6 +57,7 @@ interface CorrelationDataPoint {
 }
 
 export function BiometricCharts() {
+  const { data: user } = useCurrentUser();
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [correlationData, setCorrelationData] = useState<CorrelationDataPoint[]>([]);
   const [activityBreakdown, setActivityBreakdown] = useState<any[]>([]);
@@ -63,17 +65,15 @@ export function BiometricCharts() {
   const [timeRange, setTimeRange] = useState<"24h" | "7d" | "30d">("7d");
 
   useEffect(() => {
-    fetchBiometricData();
-  }, [timeRange]);
+    if (user) fetchBiometricData();
+  }, [timeRange, user?.id]);
 
   const fetchBiometricData = async () => {
-    setIsLoading(true);
-    
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       setIsLoading(false);
       return;
     }
+    setIsLoading(true);
 
     // Calculate date range
     const now = new Date();
