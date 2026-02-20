@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useCurrentUser } from "@/hooks/useDashboardData";
+import { useMemo, useCallback } from "react";
+import { useCurrentUser, useSessionsDetailed, useAllBiometrics } from "@/hooks/useDashboardData";
 
 export interface SongPerformance {
   songId: string;
@@ -48,49 +47,16 @@ interface UseSessionAnalyticsReturn {
   overallInsights: OverallInsights | null;
   isLoading: boolean;
   error: string | null;
-  refreshAnalytics: () => Promise<void>;
+  refreshAnalytics: () => void;
 }
 
 export function useSessionAnalytics(): UseSessionAnalyticsReturn {
   const { data: user } = useCurrentUser();
-  const [activityInsights, setActivityInsights] = useState<ActivityInsight[]>([]);
-  const [overallInsights, setOverallInsights] = useState<OverallInsights | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: sessions, error: sessionsError, isLoading: sessionsLoading, refetch: refetchSessions } = useSessionsDetailed(user?.id);
+  const { data: biometrics, isLoading: biometricsLoading, refetch: refetchBiometrics } = useAllBiometrics(user?.id);
 
-  const calculateActivityInsights = useCallback(async () => {
-    if (!user) {
-      setError("Not authenticated");
-      return;
-    }
-
-    // Fetch all sessions with their songs and biometric readings
-    const { data: sessions, error: sessionsError } = await supabase
-      .from("listening_sessions")
-      .select(`
-        *,
-        activity_types(id, name),
-        session_songs(
-          id,
-          song_id,
-          skipped,
-          play_duration_ms,
-          songs(id, title, artist, tempo, energy, valence)
-        )
-      `)
-      .eq("user_id", user.id)
-      .order("started_at", { ascending: false });
-
-    if (sessionsError) {
-      setError(sessionsError.message);
-      return;
-    }
-
-    // Fetch biometric readings
-    const { data: biometrics } = await supabase
-      .from("biometric_readings")
-      .select("*")
-      .eq("user_id", user.id);
+  const { activityInsights, overallInsights } = useMemo(() => {
+    if (!sessions || !biometrics) return { activityInsights: [], overallInsights: null };
 
     // Group sessions by activity
     const activityMap = new Map<string, {
@@ -98,7 +64,7 @@ export function useSessionAnalytics(): UseSessionAnalyticsReturn {
       biometrics: typeof biometrics;
     }>();
 
-    sessions?.forEach((session) => {
+    sessions.forEach((session) => {
       const activityId = session.activity_type_id;
       if (!activityMap.has(activityId)) {
         activityMap.set(activityId, { sessions: [], biometrics: [] });
@@ -107,8 +73,8 @@ export function useSessionAnalytics(): UseSessionAnalyticsReturn {
     });
 
     // Associate biometrics with sessions
-    biometrics?.forEach((reading) => {
-      const session = sessions?.find((s) => s.id === reading.session_id);
+    biometrics.forEach((reading) => {
+      const session = sessions.find((s) => s.id === reading.session_id);
       if (session) {
         const activityId = session.activity_type_id;
         activityMap.get(activityId)?.biometrics?.push(reading);
@@ -126,7 +92,6 @@ export function useSessionAnalytics(): UseSessionAnalyticsReturn {
 
       const activityName = activitySessions[0]?.activity_types?.name || "Unknown";
 
-      // Calculate session durations
       const durations = activitySessions.map((s) => {
         if (s.ended_at && s.started_at) {
           return new Date(s.ended_at).getTime() - new Date(s.started_at).getTime();
@@ -138,7 +103,6 @@ export function useSessionAnalytics(): UseSessionAnalyticsReturn {
         ? durations.reduce((a, b) => a + b, 0) / durations.length / 60000 
         : 0;
 
-      // Collect all songs with their performance data
       const songPerformanceMap = new Map<string, SongPerformance>();
       
       activitySessions.forEach((session) => {
@@ -148,7 +112,6 @@ export function useSessionAnalytics(): UseSessionAnalyticsReturn {
           const songId = ss.song_id;
           const existing = songPerformanceMap.get(songId);
           
-          // Get biometrics during this song playback
           const sessionBiometrics = activityBiometrics.filter(
             (b: any) => b.session_id === session.id
           );
@@ -193,34 +156,25 @@ export function useSessionAnalytics(): UseSessionAnalyticsReturn {
         });
       });
 
-      // Find best tempo and energy ranges based on flow state achievement
       const songsWithTempo = Array.from(songPerformanceMap.values()).filter((s) => s.tempo !== null);
       const flowSongs = songsWithTempo.filter((s) => s.flowStateAchieved);
       
       const bestTempoRange = flowSongs.length > 0
-        ? {
-            min: Math.min(...flowSongs.map((s) => s.tempo!)),
-            max: Math.max(...flowSongs.map((s) => s.tempo!)),
-          }
+        ? { min: Math.min(...flowSongs.map((s) => s.tempo!)), max: Math.max(...flowSongs.map((s) => s.tempo!)) }
         : { min: 100, max: 140 };
 
       const songsWithEnergy = Array.from(songPerformanceMap.values()).filter((s) => s.energy !== null);
       const flowSongsEnergy = songsWithEnergy.filter((s) => s.flowStateAchieved);
       
       const bestEnergyRange = flowSongsEnergy.length > 0
-        ? {
-            min: Math.min(...flowSongsEnergy.map((s) => s.energy!)),
-            max: Math.max(...flowSongsEnergy.map((s) => s.energy!)),
-          }
+        ? { min: Math.min(...flowSongsEnergy.map((s) => s.energy!)), max: Math.max(...flowSongsEnergy.map((s) => s.energy!)) }
         : { min: 0.4, max: 0.8 };
 
-      // Top songs by focus score (not skipped)
       const topSongs = Array.from(songPerformanceMap.values())
         .filter((s) => s.skipRate < 0.5)
         .sort((a, b) => b.avgFocusScore - a.avgFocusScore)
         .slice(0, 5);
 
-      // Calculate averages from biometrics
       const avgFocusScore = activityBiometrics.length > 0
         ? activityBiometrics.reduce((sum: number, b: any) => sum + (b.focus_score || 0), 0) / activityBiometrics.length
         : 0;
@@ -228,7 +182,6 @@ export function useSessionAnalytics(): UseSessionAnalyticsReturn {
         ? activityBiometrics.reduce((sum: number, b: any) => sum + (b.relaxation_score || 0), 0) / activityBiometrics.length
         : 0;
       
-      // Recommended BPM based on activity
       const recommendedBpm = activityName === "workout" ? 140 
         : activityName === "sleep" ? 60 
         : activityName === "study" ? 110 
@@ -246,58 +199,49 @@ export function useSessionAnalytics(): UseSessionAnalyticsReturn {
         avgFlowStateTime: flowSongs.length / (songsWithTempo.length || 1) * 100,
         avgFocusScore: Math.round(avgFocusScore),
         avgRelaxationScore: Math.round(avgRelaxation),
-        avgStressReduction: 0, // Would need before/after comparison
+        avgStressReduction: 0,
         recommendedBpm,
       });
     });
 
-    setActivityInsights(insights);
-
     // Calculate overall insights
-    const totalTime = sessions?.reduce((sum, s) => {
+    const totalTime = sessions.reduce((sum, s) => {
       if (s.ended_at && s.started_at) {
         return sum + (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime());
       }
       return sum;
-    }, 0) || 0;
+    }, 0);
 
     const flowPercentage = insights.length > 0
       ? insights.reduce((sum, i) => sum + i.avgFlowStateTime, 0) / insights.length
       : 0;
 
-    const mostProductiveActivity = insights
-      .sort((a, b) => b.avgFocusScore - a.avgFocusScore)[0]?.activityName || "None";
-    
-    const mostRelaxingActivity = insights
-      .sort((a, b) => b.avgRelaxationScore - a.avgRelaxationScore)[0]?.activityName || "None";
+    const sortedByFocus = [...insights].sort((a, b) => b.avgFocusScore - a.avgFocusScore);
+    const sortedByRelax = [...insights].sort((a, b) => b.avgRelaxationScore - a.avgRelaxationScore);
 
-    setOverallInsights({
+    const overall: OverallInsights = {
       totalListeningTime: Math.round(totalTime / 60000),
-      totalSessions: sessions?.length || 0,
+      totalSessions: sessions.length,
       flowStatePercentage: Math.round(flowPercentage),
-      mostProductiveActivity,
-      mostRelaxingActivity,
+      mostProductiveActivity: sortedByFocus[0]?.activityName || "None",
+      mostRelaxingActivity: sortedByRelax[0]?.activityName || "None",
       optimalHeartRateZone: { min: 65, max: 85 },
       peakFocusHours: [9, 10, 14, 15],
-    });
-  }, [user]);
+    };
 
-  const refreshAnalytics = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    await calculateActivityInsights();
-    setIsLoading(false);
-  }, [calculateActivityInsights]);
+    return { activityInsights: insights, overallInsights: overall };
+  }, [sessions, biometrics]);
 
-  useEffect(() => {
-    if (user) refreshAnalytics();
-  }, [refreshAnalytics, user]);
+  const refreshAnalytics = useCallback(() => {
+    refetchSessions();
+    refetchBiometrics();
+  }, [refetchSessions, refetchBiometrics]);
 
   return {
     activityInsights,
     overallInsights,
-    isLoading,
-    error,
+    isLoading: sessionsLoading || biometricsLoading,
+    error: sessionsError?.message || null,
     refreshAnalytics,
   };
 }
