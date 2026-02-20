@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useCurrentUser } from "@/hooks/useDashboardData";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useCurrentUser, useSessionsDetailed, useAllBiometrics } from "@/hooks/useDashboardData";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -90,44 +89,12 @@ function getCorrelationIndicator(value: number) {
 
 export function PersonalizedInsights() {
   const { data: user } = useCurrentUser();
-  const [profiles, setProfiles] = useState<ActivityMusicProfile[]>([]);
-  const [summary, setSummary] = useState<InsightsSummary | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: sessions, error: sessionsError, refetch: refetchSessions } = useSessionsDetailed(user?.id);
+  const { data: biometrics, refetch: refetchBiometrics } = useAllBiometrics(user?.id);
   const [selectedActivity, setSelectedActivity] = useState<string | null>(null);
 
-  const calculateInsights = useCallback(async () => {
-    if (!user) {
-      setError("Not authenticated");
-      return;
-    }
-
-    // Fetch sessions with songs and biometrics
-    const { data: sessions, error: sessionsError } = await supabase
-      .from("listening_sessions")
-      .select(`
-        *,
-        activity_types(id, name),
-        session_songs(
-          id,
-          song_id,
-          skipped,
-          play_duration_ms,
-          songs(id, title, artist, tempo, energy, valence, danceability)
-        )
-      `)
-      .eq("user_id", user.id)
-      .order("started_at", { ascending: false });
-
-    if (sessionsError) {
-      setError(sessionsError.message);
-      return;
-    }
-
-    const { data: biometrics } = await supabase
-      .from("biometric_readings")
-      .select("*")
-      .eq("user_id", user.id);
+  const { profiles, summary, error } = useMemo(() => {
+    if (!sessions || !biometrics) return { profiles: [], summary: null, error: sessionsError?.message || null };
 
     // Group by activity and calculate profiles
     const activityMap = new Map<string, {
@@ -136,9 +103,8 @@ export function PersonalizedInsights() {
       songs: any[];
     }>();
 
-    sessions?.forEach((session) => {
+    sessions.forEach((session) => {
       const activityId = session.activity_type_id;
-      const activityName = session.activity_types?.name || "unknown";
       
       if (!activityMap.has(activityId)) {
         activityMap.set(activityId, { 
@@ -151,11 +117,9 @@ export function PersonalizedInsights() {
       const entry = activityMap.get(activityId)!;
       entry.sessions.push(session);
       
-      // Get session biometrics
       const sessionBiometrics = biometrics?.filter((b) => b.session_id === session.id) || [];
       entry.biometrics.push(...sessionBiometrics);
       
-      // Get session songs with their characteristics
       session.session_songs?.forEach((ss: any) => {
         if (ss.songs && !ss.skipped) {
           const avgFocus = sessionBiometrics.length > 0
@@ -191,7 +155,6 @@ export function PersonalizedInsights() {
       
       if (songs.length === 0) return;
       
-      // Calculate optimal characteristics (weighted by flow score)
       const totalWeight = songs.reduce((sum, s) => sum + s.flowScore, 0);
       
       const optimalTempo = songs.reduce((sum, s) => sum + (s.tempo || 100) * s.flowScore, 0) / totalWeight;
@@ -199,13 +162,11 @@ export function PersonalizedInsights() {
       const optimalValence = songs.reduce((sum, s) => sum + (s.valence || 0.5) * s.flowScore, 0) / totalWeight;
       const optimalDanceability = songs.reduce((sum, s) => sum + (s.danceability || 0.5) * s.flowScore, 0) / totalWeight;
       
-      // Calculate ranges
       const tempos = songs.map((s) => s.tempo).filter(Boolean);
       const energies = songs.map((s) => s.energy).filter(Boolean);
       const valences = songs.map((s) => s.valence).filter(Boolean);
       const danceabilities = songs.map((s) => s.danceability).filter(Boolean);
       
-      // Calculate correlations (simplified Pearson correlation)
       const calculateCorrelation = (xs: number[], ys: number[]) => {
         if (xs.length < 2) return 0;
         const n = xs.length;
@@ -223,7 +184,6 @@ export function PersonalizedInsights() {
       const relaxScores = songs.map((s) => s.relaxationScore);
       const flowScores = songs.map((s) => s.flowScore);
       
-      // Generate recommendations based on data
       const recommendations: string[] = [];
       
       if (optimalTempo > 120) {
@@ -248,7 +208,6 @@ export function PersonalizedInsights() {
       totalFlow += avgFlowScore * data.sessions.length;
       totalSessions += data.sessions.length;
       
-      // Get top performing songs
       const topSongs = [...songs]
         .sort((a, b) => b.flowScore - a.flowScore)
         .slice(0, 5)
@@ -276,26 +235,10 @@ export function PersonalizedInsights() {
           danceability: optimalDanceability,
         },
         characteristicRanges: {
-          tempo: {
-            min: Math.min(...tempos, 60),
-            max: Math.max(...tempos, 180),
-            optimal: Math.round(optimalTempo),
-          },
-          energy: {
-            min: Math.min(...energies, 0),
-            max: Math.max(...energies, 1),
-            optimal: optimalEnergy,
-          },
-          valence: {
-            min: Math.min(...valences, 0),
-            max: Math.max(...valences, 1),
-            optimal: optimalValence,
-          },
-          danceability: {
-            min: Math.min(...danceabilities, 0),
-            max: Math.max(...danceabilities, 1),
-            optimal: optimalDanceability,
-          },
+          tempo: { min: Math.min(...tempos, 60), max: Math.max(...tempos, 180), optimal: Math.round(optimalTempo) },
+          energy: { min: Math.min(...energies, 0), max: Math.max(...energies, 1), optimal: optimalEnergy },
+          valence: { min: Math.min(...valences, 0), max: Math.max(...valences, 1), optimal: optimalValence },
+          danceability: { min: Math.min(...danceabilities, 0), max: Math.max(...danceabilities, 1), optimal: optimalDanceability },
         },
         biometricCorrelations: {
           tempoToFocus: calculateCorrelation(tempos, focusScores.slice(0, tempos.length)),
@@ -308,9 +251,8 @@ export function PersonalizedInsights() {
       });
     });
 
-    setProfiles(calculatedProfiles);
-    
     // Calculate overall summary
+    let computedSummary: InsightsSummary | null = null;
     if (calculatedProfiles.length > 0) {
       const bestActivity = calculatedProfiles.reduce((best, p) => 
         p.avgFlowScore > best.avgFlowScore ? p : best
@@ -321,29 +263,24 @@ export function PersonalizedInsights() {
       const avgValence = calculatedProfiles.reduce((sum, p) => sum + p.optimalCharacteristics.valence, 0) / calculatedProfiles.length;
       
       const keyFindings: string[] = [];
-      
-      // Generate key findings
       if (bestActivity.avgFlowScore > 70) {
         keyFindings.push(`You achieve excellent flow state (${bestActivity.avgFlowScore}%) during ${bestActivity.activityName}`);
       }
-      
       const tempoVariance = calculatedProfiles.reduce((sum, p) => 
         sum + Math.abs(p.optimalCharacteristics.tempo - avgTempo), 0
       ) / calculatedProfiles.length;
-      
       if (tempoVariance < 15) {
         keyFindings.push(`You prefer consistent tempo (~${Math.round(avgTempo)} BPM) across activities`);
       } else {
         keyFindings.push("Your optimal tempo varies significantly by activity - adaptive music selection recommended");
       }
-      
       if (avgEnergy > 0.6) {
         keyFindings.push("Overall, you respond better to energetic music");
       } else if (avgEnergy < 0.4) {
         keyFindings.push("You tend to perform better with calm, low-energy music");
       }
       
-      setSummary({
+      computedSummary = {
         totalSessionsAnalyzed: totalSessions,
         overallFlowAchievement: Math.round(totalFlow / Math.max(totalSessions, 1)),
         mostEffectiveActivity: bestActivity.activityName,
@@ -353,22 +290,24 @@ export function PersonalizedInsights() {
           preferredEnergyLevel: avgEnergy > 0.6 ? "High" : avgEnergy > 0.4 ? "Medium" : "Low",
           preferredMood: avgValence > 0.6 ? "Upbeat" : avgValence > 0.4 ? "Balanced" : "Calm/Melancholic",
         },
-      });
-      
-      setSelectedActivity(calculatedProfiles[0]?.activityId || null);
+      };
     }
-  }, [user]);
 
-  const refresh = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    await calculateInsights();
-    setIsLoading(false);
-  }, [calculateInsights]);
+    return { profiles: calculatedProfiles, summary: computedSummary, error: null };
+  }, [sessions, biometrics, sessionsError]);
+
+  const isLoading = !sessions && !sessionsError;
+
+  const refresh = useCallback(() => {
+    refetchSessions();
+    refetchBiometrics();
+  }, [refetchSessions, refetchBiometrics]);
 
   useEffect(() => {
-    if (user) refresh();
-  }, [refresh, user]);
+    if (profiles.length > 0 && !selectedActivity) {
+      setSelectedActivity(profiles[0]?.activityId || null);
+    }
+  }, [profiles, selectedActivity]);
 
   if (isLoading) {
     return (

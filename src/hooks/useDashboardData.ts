@@ -90,3 +90,92 @@ export function useSessionBiometrics(sessionId: string | undefined) {
     staleTime: 5 * 60 * 1000,
   });
 }
+
+export function useAllBiometrics(userId: string | undefined) {
+  return useQuery({
+    queryKey: ["all-biometrics", userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("biometric_readings")
+        .select("*")
+        .eq("user_id", userId!);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!userId,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useBiometricsByRange(userId: string | undefined, timeRange: "24h" | "7d" | "30d") {
+  return useQuery({
+    queryKey: ["biometrics-range", userId, timeRange],
+    queryFn: async () => {
+      const startDate = new Date();
+      if (timeRange === "24h") startDate.setHours(startDate.getHours() - 24);
+      else if (timeRange === "7d") startDate.setDate(startDate.getDate() - 7);
+      else startDate.setDate(startDate.getDate() - 30);
+
+      const { data, error } = await supabase
+        .from("biometric_readings")
+        .select("*")
+        .eq("user_id", userId!)
+        .gte("recorded_at", startDate.toISOString())
+        .order("recorded_at", { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!userId,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useSessionsByRange(userId: string | undefined, timeRange: "24h" | "7d" | "30d") {
+  return useQuery({
+    queryKey: ["sessions-range", userId, timeRange],
+    queryFn: async () => {
+      const startDate = new Date();
+      if (timeRange === "24h") startDate.setHours(startDate.getHours() - 24);
+      else if (timeRange === "7d") startDate.setDate(startDate.getDate() - 7);
+      else startDate.setDate(startDate.getDate() - 30);
+
+      const { data, error } = await supabase
+        .from("listening_sessions")
+        .select(`
+          id, name, started_at,
+          activity_types(name),
+          session_songs(songs(tempo, energy, valence))
+        `)
+        .eq("user_id", userId!)
+        .gte("started_at", startDate.toISOString());
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!userId,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+export function useSessionsDetailed(userId: string | undefined) {
+  return useQuery({
+    queryKey: ["sessions-detailed", userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("listening_sessions")
+        .select(`
+          *,
+          activity_types(id, name),
+          session_songs(
+            id, song_id, skipped, play_duration_ms,
+            songs(id, title, artist, tempo, energy, valence, danceability)
+          )
+        `)
+        .eq("user_id", userId!)
+        .order("started_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!userId,
+    staleTime: 2 * 60 * 1000,
+  });
+}

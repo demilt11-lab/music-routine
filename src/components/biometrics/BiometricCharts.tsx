@@ -1,8 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
 import { 
   LineChart, Line, AreaChart, Area, BarChart, Bar, ScatterChart, Scatter,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
@@ -10,7 +9,7 @@ import {
 } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Activity, Brain, Heart, Music, TrendingUp } from "lucide-react";
-import { useCurrentUser } from "@/hooks/useDashboardData";
+import { useCurrentUser, useBiometricsByRange, useSessionsByRange } from "@/hooks/useDashboardData";
 
 interface BiometricReading {
   id: string;
@@ -56,61 +55,22 @@ interface CorrelationDataPoint {
   activityType: string;
 }
 
+const calculateFlowScore = (focus: number, relaxation: number, stress: number) => {
+  return Math.round(focus * 0.5 + relaxation * 0.3 - stress * 0.2 + 20);
+};
+
 export function BiometricCharts() {
   const { data: user } = useCurrentUser();
-  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
-  const [correlationData, setCorrelationData] = useState<CorrelationDataPoint[]>([]);
-  const [activityBreakdown, setActivityBreakdown] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<"24h" | "7d" | "30d">("7d");
+  const { data: readings, isLoading: readingsLoading } = useBiometricsByRange(user?.id, timeRange);
+  const { data: sessions, isLoading: sessionsLoading } = useSessionsByRange(user?.id, timeRange);
 
-  useEffect(() => {
-    if (user) fetchBiometricData();
-  }, [timeRange, user?.id]);
+  const isLoading = readingsLoading || sessionsLoading;
 
-  const fetchBiometricData = async () => {
-    if (!user) {
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
+  const { chartData, correlationData, activityBreakdown } = useMemo(() => {
+    if (!readings) return { chartData: [], correlationData: [], activityBreakdown: [] };
 
-    // Calculate date range
-    const now = new Date();
-    const startDate = new Date();
-    if (timeRange === "24h") {
-      startDate.setHours(startDate.getHours() - 24);
-    } else if (timeRange === "7d") {
-      startDate.setDate(startDate.getDate() - 7);
-    } else {
-      startDate.setDate(startDate.getDate() - 30);
-    }
-
-    // Fetch biometric readings
-    const { data: readings } = await supabase
-      .from("biometric_readings")
-      .select("*")
-      .eq("user_id", user.id)
-      .gte("recorded_at", startDate.toISOString())
-      .order("recorded_at", { ascending: true });
-
-    // Fetch sessions with songs for correlation
-    const { data: sessions } = await supabase
-      .from("listening_sessions")
-      .select(`
-        id,
-        name,
-        started_at,
-        activity_types(name),
-        session_songs(
-          songs(tempo, energy, valence)
-        )
-      `)
-      .eq("user_id", user.id)
-      .gte("started_at", startDate.toISOString());
-
-    // Process timeline data
-    const timelineData: ChartDataPoint[] = (readings || []).map((r: BiometricReading) => {
+    const timelineData: ChartDataPoint[] = readings.map((r: BiometricReading) => {
       const date = new Date(r.recorded_at);
       return {
         time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -123,12 +83,11 @@ export function BiometricCharts() {
       };
     });
 
-    // Process correlation data (music characteristics vs biometrics)
     const correlations: CorrelationDataPoint[] = [];
     const activityStats: Record<string, { focus: number[]; relaxation: number[]; tempo: number[]; energy: number[] }> = {};
 
     (sessions || []).forEach((session: SessionWithSongs) => {
-      const sessionReadings = (readings || []).filter((r: BiometricReading) => r.session_id === session.id);
+      const sessionReadings = readings.filter((r: BiometricReading) => r.session_id === session.id);
       if (sessionReadings.length === 0) return;
 
       const avgFocus = sessionReadings.reduce((sum: number, r: BiometricReading) => sum + (r.focus_score || 0), 0) / sessionReadings.length;
@@ -157,7 +116,6 @@ export function BiometricCharts() {
       });
     });
 
-    // Calculate activity breakdown
     const breakdown = Object.entries(activityStats).map(([activity, stats]) => ({
       activity: activity.charAt(0).toUpperCase() + activity.slice(1),
       avgFocus: stats.focus.length > 0 ? Math.round(stats.focus.reduce((a, b) => a + b, 0) / stats.focus.length) : 0,
@@ -166,11 +124,8 @@ export function BiometricCharts() {
       avgEnergy: stats.energy.length > 0 ? Math.round(stats.energy.reduce((a, b) => a + b, 0) / stats.energy.length) : 0,
     }));
 
-    setChartData(timelineData);
-    setCorrelationData(correlations);
-    setActivityBreakdown(breakdown);
-    setIsLoading(false);
-  };
+    return { chartData: timelineData, correlationData: correlations, activityBreakdown: breakdown };
+  }, [readings, sessions]);
 
   const calculateFlowScore = (focus: number, relaxation: number, stress: number) => {
     return Math.round(focus * 0.5 + relaxation * 0.3 - stress * 0.2 + 20);
