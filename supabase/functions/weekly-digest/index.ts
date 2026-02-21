@@ -158,8 +158,7 @@ async function sendWebPush(
 
 async function handleDigest(admin: any, vapidPublicKey: string, vapidPrivateKey: string) {
   const { data: subscriptions, error: subErr } = await admin
-    .from("push_subscriptions")
-    .select("*");
+    .rpc("get_decrypted_push_subscriptions");
 
   if (subErr) throw subErr;
   if (!subscriptions || subscriptions.length === 0) {

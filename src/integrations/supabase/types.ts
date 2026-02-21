@@ -103,6 +103,27 @@ export type Database = {
           },
         ]
       }
+      encryption_keys: {
+        Row: {
+          created_at: string
+          id: string
+          key_name: string
+          key_value: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key_name: string
+          key_value: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key_name?: string
+          key_value?: string
+        }
+        Relationships: []
+      }
       generated_playlists: {
         Row: {
           activity_type_id: string
@@ -412,7 +433,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      decrypt_sensitive: { Args: { encrypted_text: string }; Returns: string }
+      encrypt_sensitive: { Args: { plain_text: string }; Returns: string }
+      get_decrypted_music_token: {
+        Args: { target_user_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          music_user_token: string
+          provider: string
+          updated_at: string
+          user_id: string
+        }[]
+      }
+      get_decrypted_push_subscriptions: {
+        Args: { target_user_id?: string }
+        Returns: {
+          auth: string
+          endpoint: string
+          id: string
+          p256dh: string
+          user_id: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
