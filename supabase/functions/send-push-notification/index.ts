@@ -157,9 +157,7 @@ Deno.serve(async (req) => {
     );
 
     const { data: subscriptions, error: subError } = await adminClient
-      .from("push_subscriptions")
-      .select("*")
-      .eq("user_id", recipientId);
+      .rpc("get_decrypted_push_subscriptions", { target_user_id: recipientId });
 
     if (subError) throw subError;
 
