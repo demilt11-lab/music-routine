@@ -1,3 +1,4 @@
+import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -202,37 +203,40 @@ export function SmartScheduler() {
   );
 }
 
-function SuggestionCard({ suggestion }: { suggestion: any }) {
-  return (
-    <div className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-lg">
-          {suggestion.activityIcon}
+const SuggestionCard = React.forwardRef<HTMLDivElement, { suggestion: any }>(
+  ({ suggestion, ...props }, ref) => {
+    return (
+      <div ref={ref} {...props} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-lg">
+            {suggestion.activityIcon}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-sm">{suggestion.activityName}</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <CalendarDays className="h-3 w-3" />
+              {format(suggestion.suggestedDate, "EEE, MMM d")}
+              <Clock className="h-3 w-3 ml-1" />
+              {formatHour(suggestion.suggestedHour)}
+            </div>
+          </div>
         </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-sm">{suggestion.activityName}</span>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <div className={`text-sm font-medium ${getConfidenceColor(suggestion.confidence)}`}>
+              {suggestion.confidence}%
+            </div>
+            <div className="text-xs text-muted-foreground">confidence</div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <CalendarDays className="h-3 w-3" />
-            {format(suggestion.suggestedDate, "EEE, MMM d")}
-            <Clock className="h-3 w-3 ml-1" />
-            {formatHour(suggestion.suggestedHour)}
-          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </div>
       </div>
-      <div className="flex items-center gap-3">
-        <div className="text-right">
-          <div className={`text-sm font-medium ${getConfidenceColor(suggestion.confidence)}`}>
-            {suggestion.confidence}%
-          </div>
-          <div className="text-xs text-muted-foreground">confidence</div>
-        </div>
-        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-      </div>
-    </div>
-  );
-}
+    );
+  }
+);
+SuggestionCard.displayName = "SuggestionCard";
 
 function WeeklyScheduleView({ schedule }: { schedule: { day: string; slots: any[] }[] }) {
   const today = new Date().getDay();
