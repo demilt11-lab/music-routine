@@ -127,10 +127,6 @@ export function BiometricCharts() {
     return { chartData: timelineData, correlationData: correlations, activityBreakdown: breakdown };
   }, [readings, sessions]);
 
-  const calculateFlowScore = (focus: number, relaxation: number, stress: number) => {
-    return Math.round(focus * 0.5 + relaxation * 0.3 - stress * 0.2 + 20);
-  };
-
   if (isLoading) {
     return (
       <Card>
