@@ -23,15 +23,17 @@ const Index = () => {
 
   // Redirect authenticated users to dashboard
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    // Check initial session first
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        navigate("/dashboard");
+        navigate("/dashboard", { replace: true });
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Then listen for changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        navigate("/dashboard");
+        navigate("/dashboard", { replace: true });
       }
     });
 

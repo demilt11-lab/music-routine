@@ -147,6 +147,12 @@ export function SessionFlow() {
     fetchActivities();
   }, []);
 
+  // Stable refs for timer callback deps
+  const flowNotificationsRef = useRef(flowNotifications);
+  flowNotificationsRef.current = flowNotifications;
+  const selectedActivityRef = useRef(selectedActivity);
+  selectedActivityRef.current = selectedActivity;
+
   // Timer for active session with milestone notifications
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -160,15 +166,16 @@ export function SessionFlow() {
         if (currentMilestone > sessionMilestoneRef.current && currentMilestone > 0) {
           sessionMilestoneRef.current = currentMilestone;
           const minutes = currentMilestone * 15;
-          flowNotifications.notifySessionMilestone(
+          const activity = selectedActivityRef.current;
+          flowNotificationsRef.current.notifySessionMilestone(
             `${minutes} Minutes Complete!`,
-            `Great job staying focused for ${minutes} minutes${selectedActivity ? ` on ${selectedActivity.name}` : ""}`
+            `Great job staying focused for ${minutes} minutes${activity ? ` on ${activity.name}` : ""}`
           );
         }
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [step, startTime, selectedActivity, flowNotifications]);
+  }, [step, startTime]);
 
   // Auto-play: Handle track ending and queue next song
   useEffect(() => {
