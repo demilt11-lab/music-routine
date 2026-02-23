@@ -21,6 +21,7 @@ import { AchievementBadges } from "@/components/dashboard/AchievementBadges";
 import { WeeklyRecap } from "@/components/dashboard/WeeklyRecap";
 import { useCurrentUser, useActivityTypes, useUserProfile, useRecentPlaylists } from "@/hooks/useDashboardData";
 import { useQueryClient } from "@tanstack/react-query";
+import { QuickLogButton } from "@/components/dashboard/QuickLogButton";
 import type { User } from "@supabase/supabase-js";
 
 interface GeneratedPlaylist {
@@ -52,15 +53,15 @@ const Dashboard = () => {
   const { data: playlists = [] } = useRecentPlaylists(user?.id);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session?.user) {
-        navigate("/auth");
+        navigate("/auth", { replace: true });
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session?.user) {
-        navigate("/auth");
+        navigate("/auth", { replace: true });
       }
     });
 
@@ -298,6 +299,7 @@ const Dashboard = () => {
           <PersonalizedInsights />
         </section>
       </main>
+      <QuickLogButton />
     </div>
   );
 };
