@@ -25,19 +25,25 @@ export default defineConfig(({ mode }) => ({
       },
       strategies: "generateSW",
       manifest: {
-        name: "BioMusic - Biometric-Driven Music",
+        name: "BioMusic",
         short_name: "BioMusic",
         description:
           "BioMusic adapts your soundtrack in real-time using heart rate, brainwaves, and stress data to help you reach your optimal flow state.",
-        theme_color: "#0a0a0c",
-        background_color: "#0a0a0c",
+        theme_color: "#f97316",
+        background_color: "#000000",
         display: "standalone",
         orientation: "portrait",
         scope: "/",
-        start_url: "/",
+        start_url: "/dashboard",
         icons: [
           {
-            src: "/app-icon.png",
+            src: "/icons/icon-192x192.png",
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "any",
+          },
+          {
+            src: "/icons/icon-512x512.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "any maskable",

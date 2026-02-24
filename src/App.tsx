@@ -13,6 +13,7 @@ import NotFound from "./pages/NotFound";
 import { MobileNavBar } from "./components/mobile/MobileNavBar";
 import ScrollToTop from "./components/ScrollToTop";
 import { ConnectionStatusBanner } from "./components/ConnectionStatusBanner";
+import { IOSInstallPrompt } from "./components/mobile/IOSInstallPrompt";
 
 // Lazy-load less critical pages
 const SessionHistory = lazy(() => import("./pages/SessionHistory"));
@@ -58,6 +59,7 @@ const App = () => (
             </Suspense>
           </ErrorBoundary>
           <MobileNavBar />
+          <IOSInstallPrompt />
         </div>
       </BrowserRouter>
     </TooltipProvider>

@@ -99,15 +99,24 @@
 @layer base {
   * {
     @apply border-border;
+    -webkit-tap-highlight-color: transparent;
   }
 
   html {
     @apply scroll-smooth;
+    overflow-x: hidden;
   }
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    overflow-x: hidden;
+    padding-top: env(safe-area-inset-top, 0);
+  }
+
+  /* Ensure all interactive elements have minimum touch targets */
+  button, a, input, select, textarea, [role="button"] {
+    touch-action: manipulation;
   }
 }
 

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { ShareSessionButton } from './ShareSessionButton';
 
 interface BiometricSnapshot {
   timestamp: Date;
@@ -190,11 +191,13 @@ export const SessionSummaryReport: React.FC<SessionSummaryReportProps> = ({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
-              <Share2 className="h-4 w-4 mr-1" />
-              Share
-            </Button>
-            <Button variant="outline" size="sm">
+            <ShareSessionButton
+              activityName={activityName}
+              durationSeconds={sessionDuration}
+              avgHeartRate={stats.avgHeartRate}
+              flowPercentage={stats.flowPercentage}
+            />
+            <Button variant="outline" size="sm" className="touch-manipulation min-h-[44px]">
               <Download className="h-4 w-4 mr-1" />
               Export
             </Button>
