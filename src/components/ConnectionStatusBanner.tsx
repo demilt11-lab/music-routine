@@ -1,30 +1,46 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { WifiOff } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export function ConnectionStatusBanner() {
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [isOffline, setIsOffline] = useState(false);
   const wasOffline = useRef(false);
 
-  useEffect(() => {
-    const goOffline = () => {
+  const checkOnline = useCallback(async () => {
+    if (!navigator.onLine) {
       setIsOffline(true);
       wasOffline.current = true;
-    };
-    const goOnline = () => {
+      return;
+    }
+    try {
+      await fetch("/favicon.ico", { method: "HEAD", cache: "no-store" });
       setIsOffline(false);
       if (wasOffline.current) {
         toast({ title: "Back online", description: "Your connection has been restored.", duration: 3000 });
         wasOffline.current = false;
       }
+    } catch {
+      setIsOffline(true);
+      wasOffline.current = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    checkOnline();
+
+    const goOffline = () => {
+      setIsOffline(true);
+      wasOffline.current = true;
     };
+    const goOnline = () => checkOnline();
+
     window.addEventListener("offline", goOffline);
     window.addEventListener("online", goOnline);
     return () => {
       window.removeEventListener("offline", goOffline);
       window.removeEventListener("online", goOnline);
     };
-  }, []);
+  }, [checkOnline]);
 
   if (!isOffline) return null;
 
