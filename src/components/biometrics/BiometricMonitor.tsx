@@ -5,6 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useBiometricTracking } from "@/hooks/useBiometricTracking";
 import { cn } from "@/lib/utils";
+import { ManualHeartRateInput } from "./ManualHeartRateInput";
 
 interface BiometricMonitorProps {
   onFlowStateChange?: (flowState: string) => void;
@@ -197,10 +198,15 @@ export function BiometricMonitor({ onFlowStateChange, songEnergy, songTempo }: B
             {state.isTracking ? "Simulating biometric data" : "Tracking paused"}
           </div>
           {!state.isTracking && (
-            <Button variant="outline" size="sm" onClick={handleSimulate}>
+            <Button variant="outline" size="sm" onClick={handleSimulate} className="touch-manipulation min-h-[44px]">
               Add Sample Reading
             </Button>
           )}
+        </div>
+
+        {/* Manual heart rate input */}
+        <div className="mt-4 pt-4 border-t">
+          <ManualHeartRateInput />
         </div>
       </CardContent>
     </Card>
