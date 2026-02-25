@@ -54,10 +54,10 @@ export function DeviceConnector({ onHeartRateUpdate, onConnectionChange }: Devic
       </CardHeader>
       <CardContent className="space-y-4">
         {!state.isSupported && (
-          <Alert variant="destructive">
+          <Alert>
             <AlertCircle className="w-4 h-4" />
             <AlertDescription>
-              Web Bluetooth is not supported in this browser. Try Chrome, Edge, or Opera on desktop.
+              {state.unsupportedReason || "Web Bluetooth is not supported in this browser. Try Chrome, Edge, or Opera on desktop."}
             </AlertDescription>
           </Alert>
         )}
