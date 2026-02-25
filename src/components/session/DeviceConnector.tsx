@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWebBluetooth } from "@/hooks/useWebBluetooth";
 import { cn } from "@/lib/utils";
 import { useEffect } from "react";
+import { HealthKitConnector } from "@/components/biometrics/HealthKitConnector";
 
 interface DeviceConnectorProps {
   onHeartRateUpdate?: (heartRate: number) => void;
@@ -42,7 +43,12 @@ export function DeviceConnector({ onHeartRateUpdate, onConnectionChange }: Devic
   };
 
   return (
-    <Card className="border-primary/20">
+    <div className="space-y-4">
+      {/* HealthKit / Health Connect — shown only in native apps */}
+      <HealthKitConnector onHeartRateUpdate={onHeartRateUpdate} />
+
+      {/* Bluetooth connector */}
+      <Card className="border-primary/20">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-lg">
           <Bluetooth className="w-5 h-5 text-primary" />
@@ -162,5 +168,6 @@ export function DeviceConnector({ onHeartRateUpdate, onConnectionChange }: Devic
         )}
       </CardContent>
     </Card>
+    </div>
   );
 }

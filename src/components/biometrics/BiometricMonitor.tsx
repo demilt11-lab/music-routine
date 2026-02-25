@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { useBiometricTracking } from "@/hooks/useBiometricTracking";
 import { cn } from "@/lib/utils";
 import { ManualHeartRateInput } from "./ManualHeartRateInput";
+import { HealthKitConnector } from "./HealthKitConnector";
 
 interface BiometricMonitorProps {
   onFlowStateChange?: (flowState: string) => void;
@@ -202,6 +203,11 @@ export function BiometricMonitor({ onFlowStateChange, songEnergy, songTempo }: B
               Add Sample Reading
             </Button>
           )}
+        </div>
+
+        {/* HealthKit / Health Connect integration */}
+        <div className="mt-4 pt-4 border-t">
+          <HealthKitConnector />
         </div>
 
         {/* Manual heart rate input */}
