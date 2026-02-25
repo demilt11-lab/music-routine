@@ -16,6 +16,7 @@ export interface WebBluetoothState {
   device: BluetoothDevice | null;
   error: string | null;
   lastHeartRate: number | null;
+  unsupportedReason?: string;
 }
 
 interface UseWebBluetoothReturn {
@@ -26,23 +27,51 @@ interface UseWebBluetoothReturn {
   onHeartRateChange: (callback: (heartRate: number) => void) => void;
 }
 
-// Standard Bluetooth Heart Rate Service UUID
 const HEART_RATE_SERVICE = "heart_rate";
 const HEART_RATE_MEASUREMENT = "heart_rate_measurement";
 const BATTERY_SERVICE = "battery_service";
 const BATTERY_LEVEL = "battery_level";
 
+function detectBluetoothSupport(): { supported: boolean; reason?: string } {
+  if (typeof navigator === "undefined") {
+    return { supported: false, reason: "Not running in a browser environment." };
+  }
+
+  // Detect iOS (Safari never supports Web Bluetooth)
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (isIOS) {
+    return {
+      supported: false,
+      reason: "Web Bluetooth is not available on iOS. Use the Manual Heart Rate input below to log readings from your Apple Watch.",
+    };
+  }
+
+  if (!("bluetooth" in navigator)) {
+    return {
+      supported: false,
+      reason: "Your browser doesn't support Web Bluetooth. Try Chrome, Edge, or Opera on desktop/Android.",
+    };
+  }
+
+  return { supported: true };
+}
+
 export function useWebBluetooth(): UseWebBluetoothReturn {
+  const detection = detectBluetoothSupport();
+
   const [state, setState] = useState<WebBluetoothState>({
-    isSupported: typeof navigator !== "undefined" && "bluetooth" in navigator,
+    isSupported: detection.supported,
     isScanning: false,
     isConnected: false,
     device: null,
     error: null,
     lastHeartRate: null,
+    unsupportedReason: detection.reason,
   });
 
-  const bluetoothDeviceRef = useRef<any>(null);
+  // Keep the raw browser BluetoothDevice separate — never overwrite with plain objects
+  const rawDeviceRef = useRef<any>(null);
   const gattServer = useRef<any>(null);
   const heartRateCallback = useRef<((heartRate: number) => void) | null>(null);
   const characteristicRef = useRef<any>(null);
@@ -52,70 +81,107 @@ export function useWebBluetooth(): UseWebBluetoothReturn {
   }, []);
 
   const parseHeartRate = (value: DataView): number => {
-    // Heart Rate Measurement characteristic format
-    // First byte contains flags
     const flags = value.getUint8(0);
     const is16Bit = flags & 0x01;
-    
-    // Heart rate value is in byte 1 (or bytes 1-2 if 16-bit)
-    if (is16Bit) {
-      return value.getUint16(1, true);
-    }
-    return value.getUint8(1);
+    return is16Bit ? value.getUint16(1, true) : value.getUint8(1);
   };
 
   const handleHeartRateNotification = useCallback((event: Event) => {
     const target = event.target as any;
     const value = target?.value;
-    
     if (value) {
       const heartRate = parseHeartRate(value);
       setState(prev => ({ ...prev, lastHeartRate: heartRate }));
-      
-      if (heartRateCallback.current) {
-        heartRateCallback.current(heartRate);
-      }
+      heartRateCallback.current?.(heartRate);
     }
   }, []);
 
+  const connectToGatt = async (btDevice: any): Promise<boolean> => {
+    try {
+      if (!btDevice?.gatt) {
+        throw new Error("Device does not support GATT. Please try a different device.");
+      }
+
+      const server = await btDevice.gatt.connect();
+      gattServer.current = server;
+
+      // Get Heart Rate Service
+      const heartRateService = await server.getPrimaryService(HEART_RATE_SERVICE);
+      const heartRateChar = await heartRateService.getCharacteristic(HEART_RATE_MEASUREMENT);
+      characteristicRef.current = heartRateChar;
+
+      await heartRateChar.startNotifications();
+      heartRateChar.addEventListener("characteristicvaluechanged", handleHeartRateNotification);
+
+      // Try to get battery level (optional)
+      let batteryLevel: number | undefined;
+      try {
+        const batteryService = await server.getPrimaryService(BATTERY_SERVICE);
+        const batteryChar = await batteryService.getCharacteristic(BATTERY_LEVEL);
+        const batteryValue = await batteryChar.readValue();
+        batteryLevel = batteryValue.getUint8(0);
+      } catch {
+        // Battery service not available on this device
+      }
+
+      setState(prev => ({
+        ...prev,
+        isConnected: true,
+        device: {
+          id: btDevice.id,
+          name: btDevice.name || "Unknown Device",
+          type: "heart_rate",
+          connected: true,
+          batteryLevel,
+        },
+        error: null,
+      }));
+
+      return true;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Failed to connect";
+      setState(prev => ({ ...prev, error: msg }));
+      return false;
+    }
+  };
+
   const scanForDevices = useCallback(async () => {
     if (!state.isSupported) {
-      setState(prev => ({ ...prev, error: "Web Bluetooth is not supported in this browser" }));
+      setState(prev => ({
+        ...prev,
+        error: prev.unsupportedReason || "Web Bluetooth is not supported",
+      }));
       return;
     }
 
     setState(prev => ({ ...prev, isScanning: true, error: null }));
 
     try {
-      // Request device with heart rate service
       const nav = navigator as any;
-      const device = await nav.bluetooth.requestDevice({
-        filters: [
-          { services: [HEART_RATE_SERVICE] },
-          // Also accept devices by name patterns (common fitness devices)
-          { namePrefix: "Polar" },
-          { namePrefix: "Wahoo" },
-          { namePrefix: "Garmin" },
-          { namePrefix: "Fitbit" },
-          { namePrefix: "WHOOP" },
-          { namePrefix: "Apple Watch" },
-          { namePrefix: "Mi Band" },
-          { namePrefix: "Galaxy Watch" },
-        ],
-        optionalServices: [HEART_RATE_SERVICE, BATTERY_SERVICE],
-      });
+
+      let device: any;
+      try {
+        // First attempt: filter by heart_rate service (most reliable)
+        device = await nav.bluetooth.requestDevice({
+          filters: [{ services: [HEART_RATE_SERVICE] }],
+          optionalServices: [BATTERY_SERVICE],
+        });
+      } catch (filterError: any) {
+        // If user cancelled, don't retry
+        if (filterError?.name === "NotFoundError" || filterError?.message?.includes("cancel")) {
+          throw filterError;
+        }
+        // Second attempt: accept all devices (lets user pick any BLE device)
+        device = await nav.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: [HEART_RATE_SERVICE, BATTERY_SERVICE],
+        });
+      }
 
       if (device) {
-        const deviceInfo = {
-          id: device.id,
-          name: device.name || "Unknown Device",
-          type: "heart_rate" as const,
-          connected: false,
-        };
+        rawDeviceRef.current = device;
 
-        bluetoothDeviceRef.current = device;
-        
-        // Add disconnect listener
+        // Listen for disconnects
         device.addEventListener("gattserverdisconnected", () => {
           setState(prev => ({
             ...prev,
@@ -128,91 +194,39 @@ export function useWebBluetooth(): UseWebBluetoothReturn {
         setState(prev => ({
           ...prev,
           isScanning: false,
-          device: deviceInfo,
+          device: {
+            id: device.id,
+            name: device.name || "Unknown Device",
+            type: "heart_rate",
+            connected: false,
+          },
         }));
 
-        // Auto-connect after discovery
-        await connectToDevice(device);
+        // Auto-connect
+        await connectToGatt(device);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to scan for devices";
+      const isCancelled = errorMessage.includes("cancel") || (error as any)?.name === "NotFoundError";
       setState(prev => ({
         ...prev,
         isScanning: false,
-        error: errorMessage.includes("cancelled") ? null : errorMessage,
+        error: isCancelled ? null : errorMessage,
       }));
     }
-  }, [state.isSupported]);
-
-  const connectToDevice = async (device: { id: string; name: string; type: string; connected: boolean }): Promise<boolean> => {
-    try {
-      // Use the already-discovered BluetoothDevice from the ref
-      const btDevice = bluetoothDeviceRef.current;
-      
-      if (!btDevice?.gatt) {
-        throw new Error("No device available. Please scan for devices first.");
-      }
-
-      const server = await btDevice.gatt.connect();
-      gattServer.current = server;
-
-      // Get Heart Rate Service
-      const heartRateService = await server.getPrimaryService(HEART_RATE_SERVICE);
-      const heartRateChar = await heartRateService.getCharacteristic(HEART_RATE_MEASUREMENT);
-      characteristicRef.current = heartRateChar;
-
-      // Start notifications
-      await heartRateChar.startNotifications();
-      heartRateChar.addEventListener("characteristicvaluechanged", handleHeartRateNotification);
-
-      // Try to get battery level
-      let batteryLevel: number | undefined;
-      try {
-        const batteryService = await server.getPrimaryService(BATTERY_SERVICE);
-        const batteryChar = await batteryService.getCharacteristic(BATTERY_LEVEL);
-        const batteryValue = await batteryChar.readValue();
-        batteryLevel = batteryValue.getUint8(0);
-      } catch {
-        // Battery service not available
-      }
-
-      const updatedDevice = {
-        ...device,
-        type: device.type as "heart_rate" | "fitness_band" | "unknown",
-        connected: true as const,
-        batteryLevel,
-      };
-
-      bluetoothDeviceRef.current = updatedDevice;
-      setState(prev => ({
-        ...prev,
-        isConnected: true,
-        device: updatedDevice,
-        error: null,
-      }));
-
-      return true;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to connect";
-      setState(prev => ({ ...prev, error: errorMessage }));
-      return false;
-    }
-  };
+  }, [state.isSupported, handleHeartRateNotification]);
 
   const connect = useCallback(async (): Promise<boolean> => {
-    if (!state.device) {
-      await scanForDevices();
-      return state.isConnected;
+    if (rawDeviceRef.current) {
+      return connectToGatt(rawDeviceRef.current);
     }
-    return connectToDevice(state.device);
-  }, [state.device, state.isConnected, scanForDevices]);
+    await scanForDevices();
+    return state.isConnected;
+  }, [scanForDevices, state.isConnected]);
 
   const disconnect = useCallback(() => {
     if (characteristicRef.current) {
-      characteristicRef.current.removeEventListener(
-        "characteristicvaluechanged",
-        handleHeartRateNotification
-      );
+      characteristicRef.current.removeEventListener("characteristicvaluechanged", handleHeartRateNotification);
       characteristicRef.current.stopNotifications().catch(() => {});
     }
 
@@ -231,18 +245,9 @@ export function useWebBluetooth(): UseWebBluetoothReturn {
     }));
   }, [handleHeartRateNotification]);
 
-  // Cleanup on unmount
   useEffect(() => {
-    return () => {
-      disconnect();
-    };
+    return () => { disconnect(); };
   }, [disconnect]);
 
-  return {
-    state,
-    scanForDevices,
-    connect,
-    disconnect,
-    onHeartRateChange,
-  };
+  return { state, scanForDevices, connect, disconnect, onHeartRateChange };
 }
