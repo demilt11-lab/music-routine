@@ -28,7 +28,12 @@ const config: CapacitorConfig = {
   },
   ios: {
     contentInset: 'automatic',
-    scheme: 'BioMusic'
+    scheme: 'BioMusic',
+    infoPlist: {
+      NSHealthShareUsageDescription: 'BioMusic reads your heart rate from Apple Watch to adapt music to your biometric state in real time.',
+      NSHealthUpdateUsageDescription: 'BioMusic may store wellness insights derived from your listening sessions.',
+      UIBackgroundModes: ['fetch', 'processing']
+    }
   },
   android: {
     backgroundColor: '#0a0a0c'
