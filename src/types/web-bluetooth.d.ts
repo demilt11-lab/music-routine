@@ -1,12 +1,29 @@
 // Web Bluetooth API Type Definitions
-// These extend the Navigator interface for Web Bluetooth support
 
 interface BluetoothDevice {
   id: string;
   name?: string;
   gatt?: BluetoothRemoteGATTServer;
   addEventListener(type: 'gattserverdisconnected', listener: () => void): void;
+  addEventListener(type: 'advertisementreceived', listener: (event: BluetoothAdvertisingEvent) => void): void;
   removeEventListener(type: 'gattserverdisconnected', listener: () => void): void;
+  removeEventListener(type: 'advertisementreceived', listener: (event: BluetoothAdvertisingEvent) => void): void;
+  watchAdvertisements(options?: WatchAdvertisementsOptions): Promise<void>;
+  forget(): Promise<void>;
+}
+
+interface WatchAdvertisementsOptions {
+  signal?: AbortSignal;
+}
+
+interface BluetoothAdvertisingEvent extends Event {
+  device: BluetoothDevice;
+  uuids: string[];
+  name?: string;
+  rssi?: number;
+  txPower?: number;
+  manufacturerData?: Map<number, DataView>;
+  serviceData?: Map<string, DataView>;
 }
 
 interface BluetoothRemoteGATTServer {
@@ -40,6 +57,7 @@ type BluetoothCharacteristicUUID = string | number;
 
 interface RequestDeviceOptions {
   filters?: BluetoothRequestDeviceFilter[];
+  exclusionFilters?: BluetoothRequestDeviceFilter[];
   optionalServices?: BluetoothServiceUUID[];
   acceptAllDevices?: boolean;
 }
@@ -52,9 +70,15 @@ interface BluetoothRequestDeviceFilter {
   serviceDataUUID?: BluetoothServiceUUID;
 }
 
-interface Bluetooth {
+interface BluetoothAvailabilityChangedEvent extends Event {
+  value: boolean;
+}
+
+interface Bluetooth extends EventTarget {
   getAvailability(): Promise<boolean>;
   requestDevice(options: RequestDeviceOptions): Promise<BluetoothDevice>;
+  addEventListener(type: 'availabilitychanged', listener: (event: BluetoothAvailabilityChangedEvent) => void): void;
+  removeEventListener(type: 'availabilitychanged', listener: (event: BluetoothAvailabilityChangedEvent) => void): void;
 }
 
 interface Navigator {
