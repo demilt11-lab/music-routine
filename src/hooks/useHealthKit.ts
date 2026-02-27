@@ -7,6 +7,7 @@ interface HealthKitState {
   isLoading: boolean;
   isPolling: boolean;
   lastHeartRate: number | null;
+  latestHeartRate: number | null;
   lastReadAt: Date | null;
   error: string | null;
   platform: "ios" | "android" | "web";
@@ -33,13 +34,14 @@ function detectPlatform(): "ios" | "android" | "web" {
 
 let Health: any = null;
 
-async function loadHealthPlugin() {
+async function loadHealthPlugin(): Promise<any> {
   if (Health) return Health;
   try {
     const mod = await import("@capgo/capacitor-health");
     Health = mod.Health;
     return Health;
   } catch {
+    // Expected to fail on web — no console error
     return null;
   }
 }
@@ -47,7 +49,6 @@ async function loadHealthPlugin() {
 export function useHealthKit(): UseHealthKitReturn {
   const platform = detectPlatform();
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const heartRateCallbackRef = useRef<((hr: number) => void) | null>(null);
 
   const [state, setState] = useState<HealthKitState>({
     isAvailable: false,
@@ -55,21 +56,24 @@ export function useHealthKit(): UseHealthKitReturn {
     isLoading: false,
     isPolling: false,
     lastHeartRate: null,
+    latestHeartRate: null,
     lastReadAt: null,
     error: null,
     platform,
   });
 
-  // Check availability on mount
   useEffect(() => {
     (async () => {
       const plugin = await loadHealthPlugin();
-      if (!plugin) return;
+      if (!plugin) {
+        setState((prev) => ({ ...prev, isAvailable: false }));
+        return;
+      }
       try {
         const { available } = await plugin.isAvailable();
         setState((prev) => ({ ...prev, isAvailable: available }));
       } catch {
-        // Not available (web context)
+        setState((prev) => ({ ...prev, isAvailable: false }));
       }
     })();
   }, []);
@@ -81,21 +85,11 @@ export function useHealthKit(): UseHealthKitReturn {
       if (!plugin) throw new Error("Health plugin not available");
 
       const { available } = await plugin.isAvailable();
-      if (!available) {
-        throw new Error("HealthKit is not available on this device");
-      }
+      if (!available) throw new Error("HealthKit is not available on this device");
 
-      await plugin.requestAuthorization({
-        read: ["heartRate"],
-        write: [],
-      });
+      await plugin.requestAuthorization({ read: ["heartRate"], write: [] });
 
-      setState((prev) => ({
-        ...prev,
-        isAvailable: true,
-        isAuthorized: true,
-        isLoading: false,
-      }));
+      setState((prev) => ({ ...prev, isAvailable: true, isAuthorized: true, isLoading: false }));
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Authorization failed";
@@ -110,11 +104,11 @@ export function useHealthKit(): UseHealthKitReturn {
       if (!plugin) return null;
 
       const now = new Date();
-      const fiveMinAgo = new Date(now.getTime() - 5 * 60 * 1000);
+      const oneMinAgo = new Date(now.getTime() - 60000);
 
       const { samples } = await plugin.readSamples({
         dataType: "heartRate",
-        startDate: fiveMinAgo.toISOString(),
+        startDate: oneMinAgo.toISOString(),
         endDate: now.toISOString(),
         limit: 1,
       });
@@ -124,11 +118,11 @@ export function useHealthKit(): UseHealthKitReturn {
         setState((prev) => ({
           ...prev,
           lastHeartRate: bpm,
+          latestHeartRate: bpm,
           lastReadAt: new Date(),
           error: null,
         }));
 
-        // Save to database
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           await supabase.from("biometric_readings").insert({
@@ -139,7 +133,6 @@ export function useHealthKit(): UseHealthKitReturn {
           });
         }
 
-        heartRateCallbackRef.current?.(bpm);
         return bpm;
       }
 
@@ -154,14 +147,8 @@ export function useHealthKit(): UseHealthKitReturn {
   const startPolling = useCallback(
     (intervalMs = 10000) => {
       if (pollingRef.current) return;
-
-      // Read immediately
       readLatestHeartRate();
-
-      pollingRef.current = setInterval(() => {
-        readLatestHeartRate();
-      }, intervalMs);
-
+      pollingRef.current = setInterval(() => { readLatestHeartRate(); }, intervalMs);
       setState((prev) => ({ ...prev, isPolling: true }));
     },
     [readLatestHeartRate]
@@ -175,11 +162,8 @@ export function useHealthKit(): UseHealthKitReturn {
     setState((prev) => ({ ...prev, isPolling: false }));
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => {
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
   }, []);
 
   return { state, requestAccess, readLatestHeartRate, startPolling, stopPolling };

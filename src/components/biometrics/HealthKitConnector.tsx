@@ -1,4 +1,4 @@
-import { Heart, Smartphone, RefreshCw, Play, Square, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Heart, Smartphone, RefreshCw, Play, Square, AlertCircle, CheckCircle2, Download } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,20 +11,60 @@ interface HealthKitConnectorProps {
   onHeartRateUpdate?: (heartRate: number) => void;
 }
 
+function isIOSWeb(): boolean {
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
+  return isIOS && !isNative;
+}
+
+function isDesktopOrAndroidWeb(): boolean {
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
+  return !isIOS && !isNative;
+}
+
 export function HealthKitConnector({ onHeartRateUpdate }: HealthKitConnectorProps) {
   const { state, requestAccess, readLatestHeartRate, startPolling, stopPolling } = useHealthKit();
 
-  // Forward heart rate updates
   useEffect(() => {
     if (state.lastHeartRate && onHeartRateUpdate) {
       onHeartRateUpdate(state.lastHeartRate);
     }
   }, [state.lastHeartRate, onHeartRateUpdate]);
 
-  if (state.platform === "web") {
-    return null; // Don't render on web — Bluetooth connector handles that
+  // iOS web banner
+  if (isIOSWeb()) {
+    return (
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <Download className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-medium text-sm">For automatic Apple Watch heart rate</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Download the BioMusic app to read heart rate directly from your Apple Watch via HealthKit.
+              </p>
+              <Button variant="outline" size="sm" className="mt-2 touch-manipulation min-h-[44px]">
+                <Download className="w-4 h-4 mr-1" />
+                Get BioMusic App
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
+  // Hide on desktop/Android web
+  if (isDesktopOrAndroidWeb()) {
+    return null;
+  }
+
+  // Native app rendering
   const platformLabel = state.platform === "ios" ? "Apple Health" : "Health Connect";
   const platformIcon = state.platform === "ios" ? "🍎" : "🤖";
 
@@ -53,7 +93,7 @@ export function HealthKitConnector({ onHeartRateUpdate }: HealthKitConnectorProp
           <Alert>
             <AlertCircle className="w-4 h-4" />
             <AlertDescription>
-              {platformLabel} is not available. Make sure you're running the native app (not a web browser) and {state.platform === "ios" ? "HealthKit" : "Health Connect"} is set up on your device.
+              {platformLabel} is not available. Make sure you're running the native app and {state.platform === "ios" ? "HealthKit" : "Health Connect"} is set up on your device.
             </AlertDescription>
           </Alert>
         ) : !state.isAuthorized ? (
@@ -63,22 +103,13 @@ export function HealthKitConnector({ onHeartRateUpdate }: HealthKitConnectorProp
             <p className="text-sm text-muted-foreground mb-4">
               Allow BioMusic to read your heart rate data from {state.platform === "ios" ? "Apple Watch" : "your wearable"}
             </p>
-            <Button
-              onClick={requestAccess}
-              disabled={state.isLoading}
-              className="touch-manipulation min-h-[44px]"
-            >
-              {state.isLoading ? (
-                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Heart className="w-4 h-4 mr-2" />
-              )}
+            <Button onClick={requestAccess} disabled={state.isLoading} className="touch-manipulation min-h-[44px]">
+              {state.isLoading ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Heart className="w-4 h-4 mr-2" />}
               Grant Access
             </Button>
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Connected status */}
             <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border border-primary/20">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
@@ -93,12 +124,7 @@ export function HealthKitConnector({ onHeartRateUpdate }: HealthKitConnectorProp
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={readLatestHeartRate}
-                  className="touch-manipulation min-h-[44px]"
-                >
+                <Button variant="outline" size="sm" onClick={readLatestHeartRate} className="touch-manipulation min-h-[44px]">
                   <RefreshCw className="w-4 h-4" />
                 </Button>
                 <Button
@@ -108,21 +134,14 @@ export function HealthKitConnector({ onHeartRateUpdate }: HealthKitConnectorProp
                   className="touch-manipulation min-h-[44px]"
                 >
                   {state.isPolling ? (
-                    <>
-                      <Square className="w-4 h-4 mr-1" />
-                      Stop
-                    </>
+                    <><Square className="w-4 h-4 mr-1" />Stop</>
                   ) : (
-                    <>
-                      <Play className="w-4 h-4 mr-1" />
-                      Auto-Read
-                    </>
+                    <><Play className="w-4 h-4 mr-1" />Auto-Read</>
                   )}
                 </Button>
               </div>
             </div>
 
-            {/* Heart rate display */}
             {state.lastHeartRate !== null && (
               <div className="flex items-center justify-center gap-3 p-4 rounded-lg bg-muted/50">
                 <Heart className={cn("w-6 h-6 text-red-500", state.isPolling && "animate-pulse")} />

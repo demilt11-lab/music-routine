@@ -32,6 +32,8 @@ const config: CapacitorConfig = {
     infoPlist: {
       NSHealthShareUsageDescription: 'BioMusic reads your heart rate from Apple Watch to adapt music to your biometric state in real time.',
       NSHealthUpdateUsageDescription: 'BioMusic may store wellness insights derived from your listening sessions.',
+      NSBluetoothAlwaysUsageDescription: 'BioMusic uses Bluetooth to connect to heart rate monitors for real-time biometric tracking during sessions.',
+      NSBluetoothPeripheralUsageDescription: 'BioMusic connects to Bluetooth heart rate monitors to track your biometric state.',
       UIBackgroundModes: ['fetch', 'processing']
     }
   },
