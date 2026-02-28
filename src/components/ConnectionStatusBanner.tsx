@@ -5,28 +5,27 @@ import { toast } from "@/hooks/use-toast";
 export function ConnectionStatusBanner() {
   const [isOffline, setIsOffline] = useState(false);
   const wasOffline = useRef(false);
+  const hasInitialized = useRef(false);
 
-  const checkOnline = useCallback(async () => {
+  const checkOnline = useCallback(async (isInitial = false) => {
     if (!navigator.onLine) {
+      // On initial load, trust navigator.onLine but don't show banner right away
+      if (isInitial) return;
       setIsOffline(true);
       wasOffline.current = true;
       return;
     }
-    try {
-      await fetch("/favicon.ico", { method: "HEAD", cache: "no-store" });
-      setIsOffline(false);
-      if (wasOffline.current) {
-        toast({ title: "Back online", description: "Your connection has been restored.", duration: 3000 });
-        wasOffline.current = false;
-      }
-    } catch {
-      setIsOffline(true);
-      wasOffline.current = true;
+    // If we're online according to navigator, trust it
+    setIsOffline(false);
+    if (wasOffline.current) {
+      toast({ title: "Back online", description: "Your connection has been restored.", duration: 3000 });
+      wasOffline.current = false;
     }
   }, []);
 
   useEffect(() => {
-    checkOnline();
+    // Don't probe on initial load — only react to actual offline/online events
+    hasInitialized.current = true;
 
     const goOffline = () => {
       setIsOffline(true);
