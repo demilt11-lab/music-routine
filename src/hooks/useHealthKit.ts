@@ -36,12 +36,14 @@ let Health: any = null;
 
 async function loadHealthPlugin(): Promise<any> {
   if (Health) return Health;
+  // Only attempt on native platforms — the plugin throws on web
+  const platform = detectPlatform();
+  if (platform === "web") return null;
   try {
     const mod = await import("@capgo/capacitor-health");
     Health = mod.Health;
     return Health;
   } catch {
-    // Expected to fail on web — no console error
     return null;
   }
 }
