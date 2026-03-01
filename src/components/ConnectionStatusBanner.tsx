@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, forwardRef } from "react";
 import { WifiOff } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
-export function ConnectionStatusBanner() {
+export const ConnectionStatusBanner = forwardRef<HTMLDivElement>((_, ref) => {
   const [isOffline, setIsOffline] = useState(false);
   const wasOffline = useRef(false);
   const hasInitialized = useRef(false);
@@ -44,9 +44,11 @@ export function ConnectionStatusBanner() {
   if (!isOffline) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[60] bg-destructive text-destructive-foreground text-center text-sm font-medium py-2 px-4 flex items-center justify-center gap-2 animate-in slide-in-from-top">
+    <div ref={ref} className="fixed top-0 left-0 right-0 z-[60] bg-destructive text-destructive-foreground text-center text-sm font-medium py-2 px-4 flex items-center justify-center gap-2 animate-in slide-in-from-top">
       <WifiOff className="w-4 h-4" />
       You're offline — some features may be unavailable
     </div>
   );
-}
+});
+
+ConnectionStatusBanner.displayName = "ConnectionStatusBanner";
