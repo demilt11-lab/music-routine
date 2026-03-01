@@ -1,9 +1,9 @@
 import { ChevronDown, Bluetooth, Watch, Radio, MousePointer } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useState } from "react";
+import { useState, forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
-export function BluetoothSetupGuide() {
+export const BluetoothSetupGuide = forwardRef<HTMLOListElement>((_, ref) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const steps = [
@@ -20,7 +20,7 @@ export function BluetoothSetupGuide() {
         <ChevronDown className={cn("w-4 h-4 transition-transform", isOpen && "rotate-180")} />
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <ol className="space-y-3 pt-2">
+        <ol ref={ref} className="space-y-3 pt-2">
           {steps.map((step, i) => (
             <li key={i} className="flex items-start gap-3">
               <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
@@ -36,4 +36,6 @@ export function BluetoothSetupGuide() {
       </CollapsibleContent>
     </Collapsible>
   );
-}
+});
+
+BluetoothSetupGuide.displayName = "BluetoothSetupGuide";
