@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, forwardRef } from "react";
 import { useCurrentUser, useSessionsDetailed, useAllBiometrics } from "@/hooks/useDashboardData";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -87,7 +87,7 @@ function getCorrelationIndicator(value: number) {
   return { icon: <ArrowDown className="w-3 h-3 text-red-400" />, label: "Negative" };
 }
 
-export function PersonalizedInsights() {
+export const PersonalizedInsights = forwardRef<HTMLDivElement>((_, ref) => {
   const { data: user } = useCurrentUser();
   const { data: sessions, error: sessionsError, refetch: refetchSessions } = useSessionsDetailed(user?.id);
   const { data: biometrics, refetch: refetchBiometrics } = useAllBiometrics(user?.id);
@@ -709,4 +709,6 @@ export function PersonalizedInsights() {
       </Tabs>
     </div>
   );
-}
+});
+
+PersonalizedInsights.displayName = "PersonalizedInsights";

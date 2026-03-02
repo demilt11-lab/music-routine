@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, forwardRef } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Upload, Youtube, Headphones, Music } from "lucide-react";
 import { LocalMusicUpload } from "./LocalMusicUpload";
@@ -12,7 +12,7 @@ import { useJamendo } from "@/hooks/useJamendo";
 import { useSpotify, type SpotifyTrack } from "@/hooks/useSpotify";
 import { toast } from "sonner";
 
-export function MusicTabs() {
+export const MusicTabs = forwardRef<HTMLDivElement>((_, ref) => {
   const localMusic = useLocalMusic();
   const youtubeMusic = useYouTubeMusic();
   const jamendo = useJamendo();
@@ -176,4 +176,6 @@ export function MusicTabs() {
       )}
     </div>
   );
-}
+});
+
+MusicTabs.displayName = "MusicTabs";

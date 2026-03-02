@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, forwardRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -59,7 +59,7 @@ const calculateFlowScore = (focus: number, relaxation: number, stress: number) =
   return Math.round(focus * 0.5 + relaxation * 0.3 - stress * 0.2 + 20);
 };
 
-export function BiometricCharts() {
+export const BiometricCharts = forwardRef<HTMLDivElement>((_, ref) => {
   const { data: user } = useCurrentUser();
   const [timeRange, setTimeRange] = useState<"24h" | "7d" | "30d">("7d");
   const { data: readings, isLoading: readingsLoading } = useBiometricsByRange(user?.id, timeRange);
@@ -439,4 +439,6 @@ export function BiometricCharts() {
       )}
     </div>
   );
-}
+});
+
+BiometricCharts.displayName = "BiometricCharts";
