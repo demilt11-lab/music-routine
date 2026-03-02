@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Home, History, BarChart3, Calendar, User } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,7 +18,7 @@ const navItems: NavItem[] = [
   { path: "/monthly", label: "Progress", icon: User },
 ];
 
-export function MobileNavBar() {
+export const MobileNavBar = forwardRef<HTMLElement>((_, ref) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { tapFeedback, selectionFeedback } = useNativeHaptics();
@@ -32,7 +33,7 @@ export function MobileNavBar() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden safe-area-bottom">
+    <nav ref={ref} className="fixed bottom-0 left-0 right-0 z-50 md:hidden safe-area-bottom">
       <div className="glass border-t border-border/50 backdrop-blur-xl">
         <div className="flex items-center justify-around h-16 px-2">
           {navItems.map((item) => {
@@ -71,4 +72,6 @@ export function MobileNavBar() {
       </div>
     </nav>
   );
-}
+});
+
+MobileNavBar.displayName = "MobileNavBar";
