@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, forwardRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useJamendo, JamendoTrack } from "@/hooks/useJamendo";
 import { useBiometricTracking, BiometricReading } from "@/hooks/useBiometricTracking";
@@ -156,7 +156,7 @@ function calculateBiometricAdjustment(
   return { tempoModifier, energyModifier, reason, urgency };
 }
 
-export function RecommendationEngine() {
+export const RecommendationEngine = forwardRef<HTMLDivElement>((_, ref) => {
   const [profiles, setProfiles] = useState<ActivityProfile[]>([]);
   const [selectedActivity, setSelectedActivity] = useState<string | null>(null);
   const [recommendations, setRecommendations] = useState<RecommendedTrack[]>([]);
@@ -1137,4 +1137,6 @@ export function RecommendationEngine() {
       </CardContent>
     </Card>
   );
-}
+});
+
+RecommendationEngine.displayName = "RecommendationEngine";

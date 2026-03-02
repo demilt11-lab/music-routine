@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { Heart, Activity, Brain, TrendingUp, Waves, Play, Square } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ interface BiometricMonitorProps {
   songTempo?: number;
 }
 
-export function BiometricMonitor({ onFlowStateChange, songEnergy, songTempo }: BiometricMonitorProps) {
+export const BiometricMonitor = forwardRef<HTMLDivElement, BiometricMonitorProps>(({ onFlowStateChange, songEnergy, songTempo }, ref) => {
   const { state, startTracking, stopTracking, simulateBiometrics } = useBiometricTracking();
   
   const flowStateColors = {
@@ -217,4 +218,6 @@ export function BiometricMonitor({ onFlowStateChange, songEnergy, songTempo }: B
       </CardContent>
     </Card>
   );
-}
+});
+
+BiometricMonitor.displayName = "BiometricMonitor";

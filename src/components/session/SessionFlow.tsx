@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, forwardRef } from "react";
 import { 
   Play, Square, Music, Activity, Clock, Heart, Brain,
   ChevronRight, Check, Smile, Meh, Frown, Loader2,
@@ -59,7 +59,7 @@ const moodOptions: { value: MoodRating; label: string; icon: React.ReactNode; co
   { value: "terrible", label: "Terrible", icon: <Frown className="w-8 h-8" />, color: "text-red-500 bg-red-500/20 border-red-500" },
 ];
 
-export function SessionFlow() {
+export const SessionFlow = forwardRef<HTMLDivElement>((_, ref) => {
   const [step, setStep] = useState<SessionStep>("select-activity");
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
   const [selectedActivity, setSelectedActivity] = useState<ActivityType | null>(null);
@@ -1113,4 +1113,6 @@ export function SessionFlow() {
       </CardContent>
     </Card>
   );
-}
+});
+
+SessionFlow.displayName = "SessionFlow";

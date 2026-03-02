@@ -1,10 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, forwardRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Flame, Clock, Activity, Brain, TrendingUp, Zap } from "lucide-react";
 import { formatDistanceToNow, differenceInCalendarDays, parseISO } from "date-fns";
 import { useCurrentUser, useUserSessions, useActivityTypes, useSessionBiometrics } from "@/hooks/useDashboardData";
 
-export const RecentSessionWidget = () => {
+export const RecentSessionWidget = forwardRef<HTMLDivElement>((_, ref) => {
   const { data: user } = useCurrentUser();
   const { data: sessions, isLoading } = useUserSessions(user?.id);
   const { data: activityTypes } = useActivityTypes();
@@ -138,7 +138,9 @@ export const RecentSessionWidget = () => {
       </Card>
     </div>
   );
-};
+});
+
+RecentSessionWidget.displayName = "RecentSessionWidget";
 
 const StatPill = ({
   icon, label, value, highlight = false,

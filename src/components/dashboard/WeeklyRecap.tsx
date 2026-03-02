@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, forwardRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { differenceInCalendarDays, startOfWeek, endOfWeek, format } from "date-fns";
@@ -86,7 +86,7 @@ function computeStreak(sessions: { started_at: string }[]): number {
   return streak;
 }
 
-export const WeeklyRecap = () => {
+export const WeeklyRecap = forwardRef<HTMLDivElement>((_, ref) => {
   const [dismissed, setDismissed] = useState(() => {
     const dismissedDate = localStorage.getItem(RECAP_DISMISSED_KEY);
     if (dismissedDate) {
@@ -253,4 +253,6 @@ export const WeeklyRecap = () => {
       </CardContent>
     </Card>
   );
-};
+});
+
+WeeklyRecap.displayName = "WeeklyRecap";

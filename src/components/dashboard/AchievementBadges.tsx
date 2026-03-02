@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, forwardRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -57,7 +57,7 @@ function buildBadges(total: number, streak: number): Badge[] {
   ];
 }
 
-export const AchievementBadges = () => {
+export const AchievementBadges = forwardRef<HTMLDivElement>((_, ref) => {
   const [copied, setCopied] = useState(false);
   const toastsFired = useRef(false);
 
@@ -187,4 +187,6 @@ export const AchievementBadges = () => {
       </CardContent>
     </Card>
   );
-};
+});
+
+AchievementBadges.displayName = "AchievementBadges";

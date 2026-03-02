@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
 import { 
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger 
@@ -17,7 +17,7 @@ const activityIcons: Record<string, React.ReactNode> = {
   commute: <Car className="w-4 h-4" />,
 };
 
-export function QuickLogButton() {
+export const QuickLogButton = forwardRef<HTMLDivElement>((_, ref) => {
   const [isLogging, setIsLogging] = useState(false);
   const { data: user } = useCurrentUser();
   const { data: activityTypes = [] } = useActivityTypes();
@@ -85,4 +85,6 @@ export function QuickLogButton() {
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
+});
+
+QuickLogButton.displayName = "QuickLogButton";

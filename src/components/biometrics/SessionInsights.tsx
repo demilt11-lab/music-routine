@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { useSessionAnalytics, ActivityInsight } from "@/hooks/useSessionAnalytics";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -180,7 +181,7 @@ function OverallStats({ insights, overall }: { insights: ActivityInsight[]; over
   );
 }
 
-export function SessionInsights() {
+export const SessionInsights = forwardRef<HTMLDivElement>((_, ref) => {
   const { activityInsights, overallInsights, isLoading, error, refreshAnalytics } = useSessionAnalytics();
 
   if (isLoading) {
@@ -263,4 +264,6 @@ export function SessionInsights() {
       )}
     </div>
   );
-}
+});
+
+SessionInsights.displayName = "SessionInsights";

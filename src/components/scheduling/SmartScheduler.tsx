@@ -1,4 +1,4 @@
-import React from "react";
+import React, { forwardRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,7 @@ const getConfidenceBg = (confidence: number) => {
   return "bg-muted/50";
 };
 
-export function SmartScheduler() {
+export const SmartScheduler = forwardRef<HTMLDivElement>((_, ref) => {
   const { data, isLoading, error, refresh } = useSmartScheduling();
 
   if (isLoading) {
@@ -201,7 +201,7 @@ export function SmartScheduler() {
       </CardContent>
     </Card>
   );
-}
+});
 
 const SuggestionCard = React.forwardRef<HTMLDivElement, { suggestion: any }>(
   ({ suggestion, ...props }, ref) => {
@@ -351,3 +351,5 @@ function ActivityPatternsView({ activityWindows }: { activityWindows: any[] }) {
     </ScrollArea>
   );
 }
+
+SmartScheduler.displayName = "SmartScheduler";
