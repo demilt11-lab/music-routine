@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef } from "react";
 import { X, Share, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const DISMISSED_KEY = "biomusic_ios_install_dismissed";
 
-export function IOSInstallPrompt() {
+export const IOSInstallPrompt = forwardRef<HTMLDivElement>((_, ref) => {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
@@ -26,7 +26,7 @@ export function IOSInstallPrompt() {
   if (!show) return null;
 
   return (
-    <div className="fixed bottom-20 left-4 right-4 z-[60] md:hidden animate-in slide-in-from-bottom-4">
+    <div ref={ref} className="fixed bottom-20 left-4 right-4 z-[60] md:hidden animate-in slide-in-from-bottom-4">
       <div className="glass rounded-2xl border border-border/50 p-4 shadow-lg">
         <div className="flex items-start justify-between mb-3">
           <h3 className="font-semibold text-sm">Install BioMusic</h3>
@@ -54,4 +54,6 @@ export function IOSInstallPrompt() {
       </div>
     </div>
   );
-}
+});
+
+IOSInstallPrompt.displayName = "IOSInstallPrompt";
