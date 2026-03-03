@@ -17,11 +17,21 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "app-icon.png", "splash.png"],
       workbox: {
-        navigateFallback: "/offline.html",
+        navigateFallback: null,
         navigateFallbackDenylist: [/^\/~oauth/],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,jpg,webp,woff,woff2}"],
         additionalManifestEntries: [],
         importScripts: ["/sw.js"],
+        runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.mode === "navigate",
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "pages",
+              networkTimeoutSeconds: 5,
+            },
+          },
+        ],
       },
       strategies: "generateSW",
       manifest: {
