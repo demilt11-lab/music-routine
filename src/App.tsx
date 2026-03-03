@@ -42,6 +42,40 @@ const App = () => {
     return () => window.removeEventListener("unhandledrejection", handler);
   }, []);
 
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+
+    const isPreviewHost =
+      window.location.hostname.includes("lovableproject.com") ||
+      window.location.hostname.startsWith("id-preview--");
+
+    if (!isPreviewHost || !("serviceWorker" in navigator)) return;
+    if (sessionStorage.getItem("preview-sw-cleaned") === "1") return;
+
+    const clearPreviewServiceWorker = async () => {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      if (registrations.length > 0) {
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+
+        if ("caches" in window) {
+          const keys = await caches.keys();
+          await Promise.all(
+            keys
+              .filter((key) => key.includes("workbox") || key.includes("precache") || key.includes("runtime"))
+              .map((key) => caches.delete(key))
+          );
+        }
+      }
+
+      sessionStorage.setItem("preview-sw-cleaned", "1");
+    };
+
+    clearPreviewServiceWorker().catch((error) => {
+      console.warn("Preview service worker cleanup failed:", error);
+      sessionStorage.setItem("preview-sw-cleaned", "1");
+    });
+  }, []);
+
   return (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
