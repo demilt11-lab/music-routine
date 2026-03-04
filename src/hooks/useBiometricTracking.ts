@@ -195,6 +195,9 @@ export function useBiometricTracking(): UseBiometricTrackingReturn {
       .from("biometric_readings")
       .insert(readingsToSave);
 
+    if (error) {
+      console.error("Failed to save biometric readings:", error);
+    }
     return !error;
   }, [state.readings]);
 

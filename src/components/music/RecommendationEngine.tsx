@@ -659,6 +659,16 @@ export const RecommendationEngine = forwardRef<HTMLDivElement>((_, ref) => {
     );
   }
 
+  // Static fallback recommendations when no history exists
+  const staticDefaults: Record<string, { tempo: number; energy: number; label: string }> = {
+    workout: { tempo: 140, energy: 0.85, label: "High-energy workout beats" },
+    study: { tempo: 110, energy: 0.4, label: "Calm focus music" },
+    sleep: { tempo: 60, energy: 0.15, label: "Gentle sleep sounds" },
+    relax: { tempo: 80, energy: 0.3, label: "Relaxing ambient tracks" },
+    commute: { tempo: 120, energy: 0.6, label: "Upbeat commute tunes" },
+    meditation: { tempo: 70, energy: 0.2, label: "Meditative soundscapes" },
+  };
+
   if (profiles.length === 0) {
     return (
       <Card>
@@ -672,12 +682,55 @@ export const RecommendationEngine = forwardRef<HTMLDivElement>((_, ref) => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-12 text-muted-foreground">
+          <div className="text-center py-8 text-muted-foreground">
             <Music2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p className="text-lg font-medium">No listening history yet</p>
-            <p className="text-sm mt-2">
-              Start a listening session to build your personalized recommendations
+            <p className="text-sm mt-2 mb-6">
+              Start a listening session to build your personalized recommendations.
+              In the meantime, try browsing by activity type:
             </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-w-md mx-auto">
+              {Object.entries(staticDefaults).map(([key, { label }]) => (
+                <Button
+                  key={key}
+                  variant="outline"
+                  size="sm"
+                  className="gap-1 text-xs"
+                  onClick={async () => {
+                    const d = staticDefaults[key];
+                    const tracks = await jamendo.searchByTempoEnergy(d.tempo, d.energy, key);
+                    if (tracks.length > 0) {
+                      const scored = tracks.map(t => ({ ...t, matchScore: 70, matchReasons: [d.label] }));
+                      setRecommendations(scored as RecommendedTrack[]);
+                      toast.success(`Showing ${key} recommendations`);
+                    } else {
+                      toast.info("No tracks found — try another category");
+                    }
+                  }}
+                >
+                  {activityIcons[key] || <Music2 className="w-3 h-3" />}
+                  {key.charAt(0).toUpperCase() + key.slice(1)}
+                </Button>
+              ))}
+            </div>
+            {recommendations.length > 0 && (
+              <div className="mt-6 text-left">
+                <p className="text-sm font-medium text-foreground mb-3">Suggestions:</p>
+                <div className="space-y-2">
+                  {recommendations.slice(0, 5).map((track) => (
+                    <div key={track.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{track.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{track.artist_name}</p>
+                      </div>
+                      <Button size="sm" variant="ghost" onClick={() => jamendo.play(track)}>
+                        <Play className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
