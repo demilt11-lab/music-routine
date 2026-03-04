@@ -21,16 +21,8 @@ const Index = () => {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
 
-  // Redirect authenticated users to dashboard
+  // Single auth listener — no duplicate getSession + onAuthStateChange race
   useEffect(() => {
-    // Check initial session first
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        navigate("/dashboard", { replace: true });
-      }
-    });
-
-    // Then listen for changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         navigate("/dashboard", { replace: true });

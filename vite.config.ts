@@ -13,7 +13,8 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     mode === "development" && componentTagger(),
-    mode !== "development" && VitePWA({
+    VitePWA({
+      disable: mode === "development",
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "app-icon.png", "splash.png"],
       workbox: {
