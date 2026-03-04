@@ -24,7 +24,16 @@ const TrackFeedback = lazy(() => import("./pages/TrackFeedback"));
 const AppListing = lazy(() => import("./pages/AppListing"));
 const Install = lazy(() => import("./pages/Install"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const PageLoader = () => (
   <div className="min-h-screen bg-background flex items-center justify-center">
@@ -32,7 +41,14 @@ const PageLoader = () => (
   </div>
 );
 
+/** Returns true if the current host is a non-production environment */
+const isNonProductionHost = () => {
+  const h = window.location.hostname;
+  return h === "localhost" || h.includes("lovableproject.com") || h.startsWith("id-preview--");
+};
+
 const App = () => {
+  // Suppress noisy unhandled promise rejections
   useEffect(() => {
     const handler = (event: PromiseRejectionEvent) => {
       console.error("Unhandled rejection:", event.reason);
@@ -42,72 +58,55 @@ const App = () => {
     return () => window.removeEventListener("unhandledrejection", handler);
   }, []);
 
+  // Clean up stale service workers in dev/preview environments
   useEffect(() => {
-    if (!import.meta.env.DEV) return;
+    if (!("serviceWorker" in navigator)) return;
+    if (!isNonProductionHost()) return;
 
-    const isPreviewHost =
-      window.location.hostname.includes("lovableproject.com") ||
-      window.location.hostname.startsWith("id-preview--");
-
-    if (!isPreviewHost || !("serviceWorker" in navigator)) return;
-    if (sessionStorage.getItem("preview-sw-cleaned") === "1") return;
-
-    const clearPreviewServiceWorker = async () => {
+    const cleanup = async () => {
       const registrations = await navigator.serviceWorker.getRegistrations();
-      if (registrations.length > 0) {
-        await Promise.all(registrations.map((registration) => registration.unregister()));
-
-        if ("caches" in window) {
-          const keys = await caches.keys();
-          await Promise.all(
-            keys
-              .filter((key) => key.includes("workbox") || key.includes("precache") || key.includes("runtime"))
-              .map((key) => caches.delete(key))
-          );
-        }
+      await Promise.all(registrations.map((r) => r.unregister()));
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
       }
-
-      sessionStorage.setItem("preview-sw-cleaned", "1");
     };
 
-    clearPreviewServiceWorker().catch((error) => {
-      console.warn("Preview service worker cleanup failed:", error);
-      sessionStorage.setItem("preview-sw-cleaned", "1");
-    });
+    cleanup().catch((err) => console.warn("SW cleanup failed:", err));
   }, []);
 
   return (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <ConnectionStatusBanner />
-        <ScrollToTop />
-        <div className="min-h-screen pb-16 md:pb-0">
-          <ErrorBoundary>
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/history" element={<SessionHistory />} />
-                <Route path="/insights" element={<WeeklyInsights />} />
-                <Route path="/monthly" element={<MonthlyProgress />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/feedback" element={<TrackFeedback />} />
-                <Route path="/app" element={<AppListing />} />
-                <Route path="/install" element={<Install />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-          </ErrorBoundary>
-          <MobileNavBar />
-          <IOSInstallPrompt />
-        </div>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <ConnectionStatusBanner />
+          <ScrollToTop />
+          <div className="min-h-screen pb-16 md:pb-0">
+            <ErrorBoundary>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/history" element={<SessionHistory />} />
+                  <Route path="/insights" element={<WeeklyInsights />} />
+                  <Route path="/monthly" element={<MonthlyProgress />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/feedback" element={<TrackFeedback />} />
+                  <Route path="/app" element={<AppListing />} />
+                  <Route path="/install" element={<Install />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
+            </ErrorBoundary>
+            <MobileNavBar />
+            <IOSInstallPrompt />
+          </div>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 };
 
