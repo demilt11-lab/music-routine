@@ -255,9 +255,10 @@ export function useWebBluetooth(): UseWebBluetoothReturn {
 
   const scanForDevices = useCallback(async () => {
     if (!state.isSupported) {
+      const reason = state.unsupportedReason || "Web Bluetooth is not supported in this browser. Try Chrome on desktop or Android.";
       setState((prev) => ({
         ...prev,
-        error: prev.unsupportedReason || "Web Bluetooth is not supported",
+        error: reason,
       }));
       return;
     }
