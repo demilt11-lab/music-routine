@@ -19,6 +19,10 @@ import { SmartScheduler } from "@/components/scheduling/SmartScheduler";
 import { RecentSessionWidget } from "@/components/dashboard/RecentSessionWidget";
 import { AchievementBadges } from "@/components/dashboard/AchievementBadges";
 import { WeeklyRecap } from "@/components/dashboard/WeeklyRecap";
+import { QuickStatsRow } from "@/components/dashboard/QuickStatsRow";
+import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
+import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
+import { EmptyState } from "@/components/EmptyState";
 import { useCurrentUser, useActivityTypes, useUserProfile, useRecentPlaylists } from "@/hooks/useDashboardData";
 import { useQueryClient } from "@tanstack/react-query";
 import { QuickLogButton } from "@/components/dashboard/QuickLogButton";
@@ -53,12 +57,6 @@ const Dashboard = () => {
   const { data: playlists = [] } = useRecentPlaylists(user?.id);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session?.user) {
-        navigate("/auth", { replace: true });
-      }
-    });
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session?.user) {
         navigate("/auth", { replace: true });
@@ -99,11 +97,7 @@ const Dashboard = () => {
   };
 
   if (userLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   const displayName = profile?.display_name;
@@ -119,7 +113,7 @@ const Dashboard = () => {
             </div>
             <span className="font-semibold text-lg">BioMusic</span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-4">
             <Button variant="ghost" size="sm" onClick={() => navigate("/insights")}>
               <BarChart3 className="w-4 h-4 mr-2" />
               Weekly
@@ -156,39 +150,60 @@ const Dashboard = () => {
           </p>
         </section>
 
+        {/* Quick Stats Row */}
+        <section className="mb-8">
+          <SectionErrorBoundary fallbackTitle="Quick stats failed to load">
+            <QuickStatsRow />
+          </SectionErrorBoundary>
+        </section>
+
         {/* Weekly Recap Notification */}
         <section className="mb-8">
-          <WeeklyRecap />
+          <SectionErrorBoundary fallbackTitle="Weekly recap failed to load">
+            <WeeklyRecap />
+          </SectionErrorBoundary>
         </section>
 
         {/* Recent Session Stats & Streak */}
         <section className="mb-8">
-          <RecentSessionWidget />
+          <SectionErrorBoundary fallbackTitle="Session stats failed to load">
+            <RecentSessionWidget />
+          </SectionErrorBoundary>
         </section>
 
         {/* Achievement Badges */}
         <section className="mb-8">
-          <AchievementBadges />
+          <SectionErrorBoundary fallbackTitle="Achievements failed to load">
+            <AchievementBadges />
+          </SectionErrorBoundary>
         </section>
 
         {/* Session Flow - Dedicated Listening Session */}
         <section className="mb-8">
-          <SessionFlow />
+          <SectionErrorBoundary fallbackTitle="Session flow failed to load">
+            <SessionFlow />
+          </SectionErrorBoundary>
         </section>
 
         {/* Biometric Monitor */}
         <section className="mb-8">
-          <BiometricMonitor />
+          <SectionErrorBoundary fallbackTitle="Biometric monitor failed to load">
+            <BiometricMonitor />
+          </SectionErrorBoundary>
         </section>
 
         {/* Smart Recommendations */}
         <section className="mb-8">
-          <RecommendationEngine />
+          <SectionErrorBoundary fallbackTitle="Recommendations failed to load">
+            <RecommendationEngine />
+          </SectionErrorBoundary>
         </section>
 
         {/* Smart Scheduling */}
         <section className="mb-8">
-          <SmartScheduler />
+          <SectionErrorBoundary fallbackTitle="Scheduler failed to load">
+            <SmartScheduler />
+          </SectionErrorBoundary>
         </section>
 
         {/* Music Player Section */}
@@ -197,7 +212,9 @@ const Dashboard = () => {
             <Headphones className="w-5 h-5 text-primary" />
             Your Music
           </h2>
-          <MusicTabs />
+          <SectionErrorBoundary fallbackTitle="Music player failed to load">
+            <MusicTabs />
+          </SectionErrorBoundary>
         </section>
 
         {/* Activity Cards */}
@@ -246,11 +263,14 @@ const Dashboard = () => {
         <section>
           <h2 className="text-xl font-semibold mb-4">Recent Playlists</h2>
           {playlists.length === 0 ? (
-            <Card className="p-8 text-center">
-              <ListMusic className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">
-                No playlists yet. Generate your first one above!
-              </p>
+            <Card className="p-8">
+              <EmptyState
+                icon={ListMusic}
+                title="No playlists yet"
+                description="Generate your first playlist by selecting an activity above!"
+                actionLabel="Scroll to Activities"
+                onAction={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              />
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -286,17 +306,23 @@ const Dashboard = () => {
 
         {/* Biometric Charts & Visualizations */}
         <section className="mb-12">
-          <BiometricCharts />
+          <SectionErrorBoundary fallbackTitle="Charts failed to load">
+            <BiometricCharts />
+          </SectionErrorBoundary>
         </section>
 
         {/* Session Analytics & Insights */}
         <section className="mb-12">
-          <SessionInsights />
+          <SectionErrorBoundary fallbackTitle="Session insights failed to load">
+            <SessionInsights />
+          </SectionErrorBoundary>
         </section>
 
         {/* Personalized Music Insights */}
         <section className="mb-12">
-          <PersonalizedInsights />
+          <SectionErrorBoundary fallbackTitle="Personalized insights failed to load">
+            <PersonalizedInsights />
+          </SectionErrorBoundary>
         </section>
       </main>
       <QuickLogButton />

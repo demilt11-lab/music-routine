@@ -13,22 +13,15 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  Legend,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, AreaChart, Area, BarChart, Bar, Legend,
 } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
+import { SessionExportButton } from "@/components/dashboard/SessionExportButton";
+import { ListSkeleton, ChartSkeleton } from "@/components/skeletons/ListSkeleton";
+import { EmptyState } from "@/components/EmptyState";
 
 interface Session {
   id: string;
@@ -245,6 +238,7 @@ export default function SessionHistory() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <SessionExportButton sessions={filteredSessions} />
             <Select value={timeRange} onValueChange={(v) => setTimeRange(v as typeof timeRange)}>
               <SelectTrigger className="w-32">
                 <SelectValue />
@@ -272,7 +266,21 @@ export default function SessionHistory() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 space-y-8">
+      <main className="container mx-auto px-4 py-8 space-y-8 pb-24">
+        {isLoading ? (
+          <ChartSkeleton />
+        ) : sessions.length === 0 ? (
+          <Card className="p-8">
+            <EmptyState
+              icon={Calendar}
+              title="No sessions yet"
+              description="Start your first listening session to see your history and progress here."
+              actionLabel="Go to Dashboard"
+              onAction={() => navigate("/dashboard")}
+            />
+          </Card>
+        ) : (
+        <>
         {/* Overview Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
@@ -469,15 +477,12 @@ export default function SessionHistory() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {isLoading ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Loading sessions...
-                </div>
-              ) : filteredSessions.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>No sessions found in the selected period</p>
-                </div>
+              {filteredSessions.length === 0 ? (
+                <EmptyState
+                  icon={Calendar}
+                  title="No sessions found"
+                  description="Try changing the time range or activity filter."
+                />
               ) : (
                 filteredSessions.map((session) => (
                   <div
@@ -598,6 +603,8 @@ export default function SessionHistory() {
             </div>
           </CardContent>
         </Card>
+        </>
+        )}
       </main>
     </div>
   );
