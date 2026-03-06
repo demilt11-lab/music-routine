@@ -6,27 +6,29 @@
     <title>BioMusic - Track Your Music Journey with Spotify</title>
     <meta name="description" content="BioMusic adapts your soundtrack in real-time using heart rate, brainwaves, and stress data to help you reach your optimal flow state.">
     <meta name="author" content="BioMusic" />
+
+    <!-- PWA / Mobile -->
+    <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#f97316" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="BioMusic" />
     <link rel="apple-touch-icon" href="/app-icon.png" />
+    <link rel="apple-touch-startup-image" href="/splash.png" />
 
-    
-    
+    <!-- OG / Twitter -->
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/0130729e-f55b-465e-892f-d9b76cb352cd/id-preview-d3ce8fd0--476c1409-512d-4288-8f4a-c29b42d4e4aa.lovable.app-1771942998787.png">
-
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@RoutineMusic" />
     <meta name="twitter:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/0130729e-f55b-465e-892f-d9b76cb352cd/id-preview-d3ce8fd0--476c1409-512d-4288-8f4a-c29b42d4e4aa.lovable.app-1771942998787.png">
     <meta property="og:title" content="BioMusic - Track Your Music Journey with Spotify">
-  <meta name="twitter:title" content="BioMusic - Track Your Music Journey with Spotify">
-  <meta property="og:description" content="BioMusic adapts your soundtrack in real-time using heart rate, brainwaves, and stress data to help you reach your optimal flow state.">
-  <meta name="twitter:description" content="BioMusic adapts your soundtrack in real-time using heart rate, brainwaves, and stress data to help you reach your optimal flow state.">
-  <link rel="icon" type="image/png" href="/app-icon.png">
-</head>
-
+    <meta name="twitter:title" content="BioMusic - Track Your Music Journey with Spotify">
+    <meta property="og:description" content="BioMusic adapts your soundtrack in real-time using heart rate, brainwaves, and stress data to help you reach your optimal flow state.">
+    <meta name="twitter:description" content="BioMusic adapts your soundtrack in real-time using heart rate, brainwaves, and stress data to help you reach your optimal flow state.">
+    <link rel="icon" type="image/png" href="/app-icon.png">
+  </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
