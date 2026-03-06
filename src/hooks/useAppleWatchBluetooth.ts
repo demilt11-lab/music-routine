@@ -30,14 +30,14 @@ export function useAppleWatchBluetooth(): UseAppleWatchBluetoothReturn {
   const [deviceName, setDeviceName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const serverRef = useRef<BluetoothRemoteGATTServer | null>(null);
-  const charRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
+  const serverRef = useRef<any>(null);
+  const charRef = useRef<any>(null);
 
   const isIOSSafari = detectIOSSafari();
   const isSupported = isWebBluetoothSupported();
 
   const handleHRNotification = useCallback((event: Event) => {
-    const value = (event.target as BluetoothRemoteGATTCharacteristic).value;
+    const value = (event.target as any).value as DataView | undefined;
     if (!value) return;
     // HR format: bit 0 of flags byte — 0 = uint8, 1 = uint16
     const flags = value.getUint8(0);
@@ -60,7 +60,7 @@ export function useAppleWatchBluetooth(): UseAppleWatchBluetoothReturn {
     setError(null);
 
     try {
-      const device = await navigator.bluetooth.requestDevice({
+      const device = await (navigator as any).bluetooth.requestDevice({
         filters: [{ services: ["heart_rate"] }],
         optionalServices: ["battery_service", "device_information"],
       });

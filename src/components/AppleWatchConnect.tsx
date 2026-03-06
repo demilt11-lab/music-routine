@@ -31,7 +31,7 @@ export function AppleWatchConnect() {
             </CardDescription>
           </div>
           {isConnected && (
-            <Badge variant="default" className="bg-green-600 text-white">
+            <Badge variant="default" className="bg-primary text-primary-foreground">
               <span className="w-2 h-2 bg-white rounded-full mr-1.5 animate-pulse" />
               Connected
             </Badge>
