@@ -15,6 +15,7 @@ import { BiometricCharts } from "@/components/biometrics/BiometricCharts";
 import { PersonalizedInsights } from "@/components/biometrics/PersonalizedInsights";
 import { SessionFlow } from "@/components/session/SessionFlow";
 import { RecommendationEngine } from "@/components/music/RecommendationEngine";
+import { AppleWatchConnect } from "@/components/AppleWatchConnect";
 import { SmartScheduler } from "@/components/scheduling/SmartScheduler";
 import { RecentSessionWidget } from "@/components/dashboard/RecentSessionWidget";
 import { AchievementBadges } from "@/components/dashboard/AchievementBadges";
@@ -185,10 +186,13 @@ const Dashboard = () => {
           </SectionErrorBoundary>
         </section>
 
-        {/* Biometric Monitor */}
-        <section className="mb-8">
+        {/* Biometric Monitor & Apple Watch */}
+        <section className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
           <SectionErrorBoundary fallbackTitle="Biometric monitor failed to load">
             <BiometricMonitor />
+          </SectionErrorBoundary>
+          <SectionErrorBoundary fallbackTitle="Apple Watch connect failed to load">
+            <AppleWatchConnect />
           </SectionErrorBoundary>
         </section>
 
