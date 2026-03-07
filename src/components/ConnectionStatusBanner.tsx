@@ -3,43 +3,58 @@ import { WifiOff, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
-const DEBOUNCE_MS = 3000;
+const DEBOUNCE_MS = 4000;
 const FETCH_TIMEOUT_MS = 5000;
+const GRACE_PERIOD_MS = 6000;
 
-/** Perform a real connectivity test — resolves true if the network is reachable. */
+/** Perform a real connectivity test using multiple fallback URLs. */
 async function testConnectivity(): Promise<boolean> {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    await fetch("https://www.google.com/favicon.ico", {
-      mode: "no-cors",
-      cache: "no-store",
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-    return true;
-  } catch {
+  // If navigator.onLine is false, that's a strong signal
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
     return false;
   }
+
+  const urls = [
+    `/manifest.json?_=${Date.now()}`, // Same-origin — works in iframes
+    `https://www.google.com/favicon.ico`,
+  ];
+
+  for (const url of urls) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      await fetch(url, { mode: "no-cors", cache: "no-store", signal: controller.signal });
+      clearTimeout(timer);
+      return true; // Any success = online
+    } catch {
+      // Try next URL
+    }
+  }
+  return false;
 }
 
 export const ConnectionStatusBanner = forwardRef<HTMLDivElement>((_, ref) => {
-  // Default to ONLINE — never show offline on first render
   const [isOffline, setIsOffline] = useState(false);
   const [checking, setChecking] = useState(false);
   const mountTime = useRef(Date.now());
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wasOffline = useRef(false);
+  const hasPassedGrace = useRef(false);
 
   const runConnectivityCheck = async (source: "event" | "manual") => {
-    // Never show offline within first 3 seconds of app life
-    if (Date.now() - mountTime.current < DEBOUNCE_MS && source !== "manual") return;
+    const elapsed = Date.now() - mountTime.current;
+
+    // Never show offline during the grace period (unless manually triggered)
+    if (elapsed < GRACE_PERIOD_MS && source !== "manual") {
+      return;
+    }
+    hasPassedGrace.current = true;
 
     setChecking(true);
     const online = await testConnectivity();
     setChecking(false);
 
-    if (!online) {
+    if (!online && hasPassedGrace.current) {
       setIsOffline(true);
       wasOffline.current = true;
     } else {
@@ -53,7 +68,6 @@ export const ConnectionStatusBanner = forwardRef<HTMLDivElement>((_, ref) => {
 
   useEffect(() => {
     const goOffline = () => {
-      // Debounce: wait 3s before actually testing
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       debounceTimer.current = setTimeout(() => {
         runConnectivityCheck("event");
@@ -62,6 +76,7 @@ export const ConnectionStatusBanner = forwardRef<HTMLDivElement>((_, ref) => {
 
     const goOnline = () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      // Quick check to dismiss the banner
       runConnectivityCheck("event");
     };
 

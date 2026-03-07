@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, forwardRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,7 @@ interface SpotifyPlayerProps {
   onPause: () => void;
 }
 
-export function SpotifyPlayer({
+export const SpotifyPlayer = forwardRef<HTMLDivElement, SpotifyPlayerProps>(({
   isConnected,
   isLoading,
   tracks,
@@ -37,7 +37,7 @@ export function SpotifyPlayer({
   onSearch,
   onPlay,
   onPause,
-}: SpotifyPlayerProps) {
+}, ref) => {
   const [query, setQuery] = useState("");
 
   const handleSearch = (e: React.FormEvent) => {
@@ -154,4 +154,6 @@ export function SpotifyPlayer({
       )}
     </div>
   );
-}
+});
+
+SpotifyPlayer.displayName = "SpotifyPlayer";
