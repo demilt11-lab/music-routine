@@ -154,4 +154,6 @@ export const SpotifyPlayer = forwardRef<HTMLDivElement, SpotifyPlayerProps>(({
       )}
     </div>
   );
-}
+});
+
+SpotifyPlayer.displayName = "SpotifyPlayer";
