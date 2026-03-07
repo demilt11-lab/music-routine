@@ -24,7 +24,7 @@ interface SpotifyPlayerProps {
   onPause: () => void;
 }
 
-export function SpotifyPlayer({
+export const SpotifyPlayer = forwardRef<HTMLDivElement, SpotifyPlayerProps>(({
   isConnected,
   isLoading,
   tracks,
@@ -37,7 +37,7 @@ export function SpotifyPlayer({
   onSearch,
   onPlay,
   onPause,
-}: SpotifyPlayerProps) {
+}, ref) => {
   const [query, setQuery] = useState("");
 
   const handleSearch = (e: React.FormEvent) => {
