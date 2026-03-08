@@ -46,6 +46,7 @@ const activityIcons: Record<string, React.ReactNode> = {
   study: <BookOpen className="w-6 h-6" />,
   relax: <Coffee className="w-6 h-6" />,
   commute: <Car className="w-6 h-6" />,
+  meditation: <Brain className="w-6 h-6" />,
 };
 
 const Dashboard = () => {
