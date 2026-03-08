@@ -50,11 +50,16 @@ export const QuickStatsRow = () => {
       ? Math.round(hrReadings.reduce((sum, b) => sum + (b.heart_rate || 0), 0) / hrReadings.length)
       : 0;
 
+    const lastSessionDate = sessions.length > 0
+      ? new Date(sessions.sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())[0].started_at)
+      : null;
+
     return {
       sessionsThisWeek: thisWeekSessions.length,
       avgHR,
       totalMinutes: Math.round(totalMinutes),
       streak: computeStreak(sessions),
+      lastSessionDate,
     };
   }, [sessions, biometrics]);
 
