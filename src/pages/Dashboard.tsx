@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,12 +13,22 @@ import {
 import { MusicTabs } from "@/components/music/MusicTabs";
 import { BiometricMonitor } from "@/components/biometrics/BiometricMonitor";
 import { SessionInsights } from "@/components/biometrics/SessionInsights";
-import { BiometricCharts } from "@/components/biometrics/BiometricCharts";
-import { PersonalizedInsights } from "@/components/biometrics/PersonalizedInsights";
 import { SessionFlow } from "@/components/session/SessionFlow";
 import { RecommendationEngine } from "@/components/music/RecommendationEngine";
 import { AppleWatchConnect } from "@/components/AppleWatchConnect";
-import { SmartScheduler } from "@/components/scheduling/SmartScheduler";
+import { RecentSessionWidget } from "@/components/dashboard/RecentSessionWidget";
+import { AchievementBadges } from "@/components/dashboard/AchievementBadges";
+import { WeeklyRecap } from "@/components/dashboard/WeeklyRecap";
+import { QuickStatsRow } from "@/components/dashboard/QuickStatsRow";
+import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
+import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
+import { EmptyState } from "@/components/EmptyState";
+import { ChartSkeleton } from "@/components/skeletons/ListSkeleton";
+
+// Lazy-load heavy chart/analytics components
+const BiometricCharts = lazy(() => import("@/components/biometrics/BiometricCharts").then(m => ({ default: m.BiometricCharts })));
+const PersonalizedInsights = lazy(() => import("@/components/biometrics/PersonalizedInsights").then(m => ({ default: m.PersonalizedInsights })));
+const SmartScheduler = lazy(() => import("@/components/scheduling/SmartScheduler").then(m => ({ default: m.SmartScheduler })));
 import { RecentSessionWidget } from "@/components/dashboard/RecentSessionWidget";
 import { AchievementBadges } from "@/components/dashboard/AchievementBadges";
 import { WeeklyRecap } from "@/components/dashboard/WeeklyRecap";
