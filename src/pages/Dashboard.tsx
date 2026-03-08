@@ -401,7 +401,9 @@ const Dashboard = () => {
         {/* Biometric Charts & Visualizations */}
         <section className="mb-12">
           <SectionErrorBoundary fallbackTitle="Charts failed to load">
-            <BiometricCharts />
+            <Suspense fallback={<ChartSkeleton />}>
+              <BiometricCharts />
+            </Suspense>
           </SectionErrorBoundary>
         </section>
 
@@ -415,7 +417,9 @@ const Dashboard = () => {
         {/* Personalized Music Insights */}
         <section className="mb-12">
           <SectionErrorBoundary fallbackTitle="Personalized insights failed to load">
-            <PersonalizedInsights />
+            <Suspense fallback={<ChartSkeleton />}>
+              <PersonalizedInsights />
+            </Suspense>
           </SectionErrorBoundary>
         </section>
       </main>
