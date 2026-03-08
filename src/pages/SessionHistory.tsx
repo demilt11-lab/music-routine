@@ -68,6 +68,7 @@ const activityIcons: Record<string, React.ReactNode> = {
   study: <BookOpen className="w-5 h-5" />,
   relax: <Coffee className="w-5 h-5" />,
   commute: <Car className="w-5 h-5" />,
+  meditation: <Brain className="w-5 h-5" />,
 };
 
 const moodIcons: Record<string, React.ReactNode> = {
