@@ -16,6 +16,9 @@ interface Preferences {
   theme: string;
   notifications: boolean;
   autoplay: boolean;
+  sessionReminders: boolean;
+  achievementAlerts: boolean;
+  weeklySummaryEmails: boolean;
 }
 
 const Settings = () => {
