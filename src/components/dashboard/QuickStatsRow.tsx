@@ -75,8 +75,12 @@ export const QuickStatsRow = () => {
 
   if (!stats) return null;
 
+  const sessionsSubtitle = stats.sessionsThisWeek === 0 && stats.lastSessionDate
+    ? `Last session: ${formatDistanceToNow(stats.lastSessionDate, { addSuffix: true })}`
+    : undefined;
+
   const items = [
-    { icon: Activity, label: "Sessions This Week", value: stats.sessionsThisWeek.toString(), color: "text-primary" },
+    { icon: Activity, label: "Sessions This Week", value: stats.sessionsThisWeek.toString(), color: "text-primary", subtitle: sessionsSubtitle },
     { icon: Heart, label: "Avg HR This Week", value: stats.avgHR ? `${stats.avgHR} bpm` : "—", color: "text-destructive" },
     { icon: Clock, label: "Minutes This Week", value: `${stats.totalMinutes}`, color: "text-blue-500" },
     { icon: Flame, label: "Day Streak", value: stats.streak.toString(), color: "text-orange-500" },
