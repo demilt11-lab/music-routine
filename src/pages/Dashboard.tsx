@@ -278,44 +278,73 @@ const Dashboard = () => {
 
         {/* Activity Cards */}
         <section className="mb-12">
-          <h2 className="text-xl font-semibold mb-4">Generate Playlist by Activity</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          <h2 className="text-xl font-semibold mb-4">Curated Playlists by Activity</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             {activityTypes.map((activity) => (
               <Card 
                 key={activity.id} 
-                className="hover:border-primary/50 transition-colors cursor-pointer group"
+                className={cn(
+                  "hover:border-primary/50 transition-colors cursor-pointer group",
+                  expandedActivity === activity.name && "border-primary"
+                )}
+                onClick={() => setExpandedActivity(expandedActivity === activity.name ? null : activity.name)}
               >
                 <CardHeader className="pb-2">
                   <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:bg-primary/20 transition-colors">
                     {activityIcons[activity.name] || <Music className="w-6 h-6" />}
                   </div>
-                  <CardTitle className="capitalize">{activity.name}</CardTitle>
-                  <CardDescription className="text-sm">
+                  <CardTitle className="capitalize text-base">{activity.name}</CardTitle>
+                  <CardDescription className="text-xs">
                     {activity.description}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Button
                     className="w-full"
-                    onClick={() => handleGeneratePlaylist(activity.name)}
-                    disabled={generatingFor === activity.name}
+                    variant={expandedActivity === activity.name ? "secondary" : "default"}
+                    size="sm"
                   >
-                    {generatingFor === activity.name ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        Generate
-                      </>
-                    )}
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    {expandedActivity === activity.name ? "Hide" : "Browse"}
                   </Button>
                 </CardContent>
               </Card>
             ))}
           </div>
+
+          {/* Expanded curated playlists */}
+          {expandedActivity && curatedPlaylists[expandedActivity] && (
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {curatedPlaylists[expandedActivity].map((playlist, idx) => (
+                <Card key={idx} className="hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">{playlist.name}</CardTitle>
+                    <CardDescription className="text-sm">{playlist.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => window.open(`https://open.spotify.com/search/${encodeURIComponent(playlist.spotifyQuery)}`, "_blank")}
+                    >
+                      <ExternalLink className="w-3 h-3 mr-1" />
+                      Spotify
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => window.open(`https://music.youtube.com/search?q=${encodeURIComponent(playlist.youtubeQuery)}`, "_blank")}
+                    >
+                      <ExternalLink className="w-3 h-3 mr-1" />
+                      YouTube
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Recent Playlists */}
