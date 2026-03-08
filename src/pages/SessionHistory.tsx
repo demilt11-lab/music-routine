@@ -101,12 +101,13 @@ export default function SessionHistory() {
     const days = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90;
     const startDate = subDays(new Date(), days);
 
-    // Fetch sessions
+    // Fetch sessions with song counts
     const { data: sessionsData, error: sessionsError } = await supabase
       .from("listening_sessions")
       .select(`
         *,
-        activity_types(id, name)
+        activity_types(id, name),
+        session_songs(id)
       `)
       .eq("user_id", user.id)
       .gte("started_at", startDate.toISOString())
