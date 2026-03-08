@@ -84,7 +84,12 @@ export const SpotifyPlayer = forwardRef<HTMLDivElement, SpotifyPlayerProps>(({
           )}
           {!isPremium && !sdkReady && (
             <Badge variant="secondary" className="text-xs">
-              Preview Mode
+              Browse Only
+            </Badge>
+          )}
+          {!sdkReady && isPremium && (
+            <Badge variant="secondary" className="text-xs text-muted-foreground">
+              Initializing playback…
             </Badge>
           )}
         </div>
