@@ -103,6 +103,7 @@ const activityIcons: Record<string, React.ReactNode> = {
 
 const Dashboard = () => {
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
+  const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
