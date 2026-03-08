@@ -68,6 +68,7 @@ const activityIcons: Record<string, React.ReactNode> = {
   study: <BookOpen className="w-5 h-5" />,
   relax: <Coffee className="w-5 h-5" />,
   commute: <Car className="w-5 h-5" />,
+  meditation: <Brain className="w-5 h-5" />,
 };
 
 const moodIcons: Record<string, React.ReactNode> = {
@@ -101,12 +102,13 @@ export default function SessionHistory() {
     const days = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90;
     const startDate = subDays(new Date(), days);
 
-    // Fetch sessions
+    // Fetch sessions with song counts
     const { data: sessionsData, error: sessionsError } = await supabase
       .from("listening_sessions")
       .select(`
         *,
-        activity_types(id, name)
+        activity_types(id, name),
+        session_songs(id)
       `)
       .eq("user_id", user.id)
       .gte("started_at", startDate.toISOString())
@@ -161,6 +163,7 @@ export default function SessionHistory() {
         avgStress: Math.round(avgStress),
         flowScore: Math.round(Math.max(0, Math.min(100, flowScore))),
         duration,
+        songCount: (session as any).session_songs?.length || 0,
       };
     });
 

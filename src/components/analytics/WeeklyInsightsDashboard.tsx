@@ -521,7 +521,33 @@ export function WeeklyInsightsDashboard() {
     );
   }
 
-  if (!data) return null;
+  if (!data) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <Brain className="h-6 w-6 text-primary" />
+              Weekly Insights
+            </h2>
+          </div>
+          <Button onClick={refresh} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
+        <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <Activity className="h-12 w-12 text-muted-foreground/40 mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No session data yet</h3>
+            <p className="text-sm text-muted-foreground max-w-md">
+              No session data for this week. Start a session to see your trends — daily patterns, optimal timing, and activity insights will appear here.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const { overallStats, dayPatterns, hourPatterns, currentWeekTrend, previousWeekTrend, musicTimingInsights } = data;
 
