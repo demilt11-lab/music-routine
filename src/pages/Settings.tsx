@@ -67,10 +67,14 @@ const Settings = () => {
       setDisplayName(data.display_name ?? "");
       setAvatarUrl(data.avatar_url ?? "");
       if (data.preferences && typeof data.preferences === "object" && !Array.isArray(data.preferences)) {
+        const p = data.preferences as Record<string, unknown>;
         setPreferences({
-          theme: (data.preferences as Record<string, unknown>).theme as string ?? "dark",
-          notifications: (data.preferences as Record<string, unknown>).notifications as boolean ?? true,
-          autoplay: (data.preferences as Record<string, unknown>).autoplay as boolean ?? true,
+          theme: p.theme as string ?? "dark",
+          notifications: p.notifications as boolean ?? true,
+          autoplay: p.autoplay as boolean ?? true,
+          sessionReminders: p.sessionReminders as boolean ?? true,
+          achievementAlerts: p.achievementAlerts as boolean ?? true,
+          weeklySummaryEmails: p.weeklySummaryEmails as boolean ?? false,
         });
       }
     }
