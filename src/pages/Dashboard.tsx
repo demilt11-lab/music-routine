@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { 
-  Music, LogOut, Moon, Dumbbell, BookOpen, Coffee, Car, 
-  Sparkles, Loader2, Play, Clock, ListMusic, Headphones, BarChart3, History, Calendar, Settings
+  Music, LogOut, Moon, Dumbbell, BookOpen, Coffee, Car, Brain,
+  Sparkles, Loader2, Play, Clock, ListMusic, Headphones, BarChart3, History, Calendar, Settings,
+  ExternalLink
 } from "lucide-react";
 import { MusicTabs } from "@/components/music/MusicTabs";
 import { BiometricMonitor } from "@/components/biometrics/BiometricMonitor";
