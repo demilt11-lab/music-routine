@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Activity, Heart, Clock, Flame } from "lucide-react";
-import { differenceInCalendarDays, startOfWeek, endOfWeek } from "date-fns";
+import { differenceInCalendarDays, startOfWeek, endOfWeek, formatDistanceToNow } from "date-fns";
 import { useCurrentUser, useUserSessions, useAllBiometrics } from "@/hooks/useDashboardData";
 import { Skeleton } from "@/components/ui/skeleton";
 
