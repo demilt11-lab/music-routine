@@ -635,11 +635,13 @@ export const SessionFlow = forwardRef<HTMLDivElement>((_, ref) => {
           <div className="space-y-6">
             <div>
               <h3 className="font-medium mb-3">What are you doing?</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3" role="group" aria-label="Select your activity">
                 {activityTypes.map((activity) => (
                   <button
                     key={activity.id}
                     onClick={() => handleActivitySelect(activity)}
+                    aria-label={`Select ${activity.name} activity`}
+                    aria-pressed={selectedActivity?.id === activity.id}
                     className={cn(
                       "p-4 rounded-lg border-2 transition-all text-center",
                       selectedActivity?.id === activity.id

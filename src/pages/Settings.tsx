@@ -203,7 +203,50 @@ const Settings = () => {
           </CardContent>
         </Card>
 
-        {/* Push Notifications */}
+        {/* Notification Preferences */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="w-5 h-5 text-primary" />
+              Notification Preferences
+            </CardTitle>
+            <CardDescription>Choose which notifications you receive</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Session Reminders</p>
+                <p className="text-sm text-muted-foreground">Get reminded to start your daily session</p>
+              </div>
+              <Switch
+                checked={preferences.sessionReminders}
+                onCheckedChange={(v) => setPreferences((p) => ({ ...p, sessionReminders: v }))}
+              />
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Achievement Alerts</p>
+                <p className="text-sm text-muted-foreground">Be notified when you earn badges or hit streaks</p>
+              </div>
+              <Switch
+                checked={preferences.achievementAlerts}
+                onCheckedChange={(v) => setPreferences((p) => ({ ...p, achievementAlerts: v }))}
+              />
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Weekly Summary Emails</p>
+                <p className="text-sm text-muted-foreground">Receive a weekly email with your session stats</p>
+              </div>
+              <Switch
+                checked={preferences.weeklySummaryEmails}
+                onCheckedChange={(v) => setPreferences((p) => ({ ...p, weeklySummaryEmails: v }))}
+              />
+            </div>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

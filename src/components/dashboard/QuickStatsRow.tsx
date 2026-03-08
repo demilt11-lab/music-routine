@@ -98,6 +98,9 @@ export const QuickStatsRow = () => {
               <div>
                 <p className="text-2xl font-bold">{item.value}</p>
                 <p className="text-xs text-muted-foreground">{item.label}</p>
+                {item.subtitle && (
+                  <p className="text-[10px] text-muted-foreground/70 mt-0.5">{item.subtitle}</p>
+                )}
               </div>
             </div>
           </CardContent>
