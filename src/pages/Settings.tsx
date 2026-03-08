@@ -29,6 +29,9 @@ const Settings = () => {
     theme: "dark",
     notifications: true,
     autoplay: true,
+    sessionReminders: true,
+    achievementAlerts: true,
+    weeklySummaryEmails: false,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
