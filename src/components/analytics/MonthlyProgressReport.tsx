@@ -505,7 +505,33 @@ export function MonthlyProgressReport() {
     );
   }
 
-  if (!data) return null;
+  if (!data) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <Calendar className="h-6 w-6 text-primary" />
+              Monthly Progress Report
+            </h2>
+          </div>
+          <Button onClick={refresh} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
+        <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <Activity className="h-12 w-12 text-muted-foreground/40 mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No monthly data yet</h3>
+            <p className="text-sm text-muted-foreground max-w-md">
+              Complete sessions this month to see your progress. Weekly summaries, flow trends, and activity insights will appear here.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const { overallStats, weeklySummaries, flowProgress, musicPreferenceTrends, activityProgress, milestones, monthOverMonthComparison } = data;
 
