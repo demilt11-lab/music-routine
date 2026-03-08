@@ -53,8 +53,11 @@ export const SpotifyPlayer = forwardRef<HTMLDivElement, SpotifyPlayerProps>(({
             <Music className="w-8 h-8 text-[#1DB954]" />
           </div>
           <h3 className="text-lg font-semibold mb-2">Connect Spotify</h3>
-          <p className="text-sm text-muted-foreground mb-6 max-w-sm">
+          <p className="text-sm text-muted-foreground mb-4 max-w-sm">
             Link your Spotify account to search and play millions of tracks during your sessions.
+          </p>
+          <p className="text-xs text-muted-foreground mb-6 max-w-sm bg-muted/50 rounded-lg px-3 py-2">
+            ⚠️ Spotify requires a <span className="font-semibold">Premium account</span> for full playback. Free accounts can browse and search tracks.
           </p>
           <Button onClick={onConnect} disabled={isLoading} className="bg-[#1DB954] hover:bg-[#1ed760] text-white">
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <LogIn className="w-4 h-4 mr-2" />}
