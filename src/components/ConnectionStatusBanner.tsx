@@ -43,16 +43,10 @@ export const ConnectionStatusBanner = forwardRef<HTMLDivElement>((_, ref) => {
   const wasOffline = useRef(false);
   const hasPassedGrace = useRef(false);
 
-  // In preview/dev environments, never show the offline banner
-  if (isPreviewEnv) return null;
-
   const runConnectivityCheck = async (source: "event" | "manual") => {
+    if (isPreviewEnv) return;
     const elapsed = Date.now() - mountTime.current;
-
-    // Never show offline during the grace period (unless manually triggered)
-    if (elapsed < GRACE_PERIOD_MS && source !== "manual") {
-      return;
-    }
+    if (elapsed < GRACE_PERIOD_MS && source !== "manual") return;
     hasPassedGrace.current = true;
 
     setChecking(true);
@@ -72,6 +66,8 @@ export const ConnectionStatusBanner = forwardRef<HTMLDivElement>((_, ref) => {
   };
 
   useEffect(() => {
+    if (isPreviewEnv) return;
+
     const goOffline = () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       debounceTimer.current = setTimeout(() => {
@@ -81,7 +77,6 @@ export const ConnectionStatusBanner = forwardRef<HTMLDivElement>((_, ref) => {
 
     const goOnline = () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
-      // Quick check to dismiss the banner
       runConnectivityCheck("event");
     };
 
@@ -95,7 +90,7 @@ export const ConnectionStatusBanner = forwardRef<HTMLDivElement>((_, ref) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (!isOffline) return null;
+  if (isPreviewEnv || !isOffline) return null;
 
   return (
     <div
