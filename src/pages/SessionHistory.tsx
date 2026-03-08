@@ -162,6 +162,7 @@ export default function SessionHistory() {
         avgStress: Math.round(avgStress),
         flowScore: Math.round(Math.max(0, Math.min(100, flowScore))),
         duration,
+        songCount: (session as any).session_songs?.length || 0,
       };
     });
 
