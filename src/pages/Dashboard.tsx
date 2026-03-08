@@ -265,7 +265,9 @@ const Dashboard = () => {
         {/* Smart Scheduling */}
         <section className="mb-8">
           <SectionErrorBoundary fallbackTitle="Scheduler failed to load">
-            <SmartScheduler />
+            <Suspense fallback={<ChartSkeleton />}>
+              <SmartScheduler />
+            </Suspense>
           </SectionErrorBoundary>
         </section>
 
