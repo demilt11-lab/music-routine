@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Activity, Heart, Clock, Flame } from "lucide-react";
-import { differenceInCalendarDays, startOfWeek, endOfWeek } from "date-fns";
+import { differenceInCalendarDays, startOfWeek, endOfWeek, formatDistanceToNow } from "date-fns";
 import { useCurrentUser, useUserSessions, useAllBiometrics } from "@/hooks/useDashboardData";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -50,11 +50,16 @@ export const QuickStatsRow = () => {
       ? Math.round(hrReadings.reduce((sum, b) => sum + (b.heart_rate || 0), 0) / hrReadings.length)
       : 0;
 
+    const lastSessionDate = sessions.length > 0
+      ? new Date(sessions.sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())[0].started_at)
+      : null;
+
     return {
       sessionsThisWeek: thisWeekSessions.length,
       avgHR,
       totalMinutes: Math.round(totalMinutes),
       streak: computeStreak(sessions),
+      lastSessionDate,
     };
   }, [sessions, biometrics]);
 
@@ -70,8 +75,12 @@ export const QuickStatsRow = () => {
 
   if (!stats) return null;
 
+  const sessionsSubtitle = stats.sessionsThisWeek === 0 && stats.lastSessionDate
+    ? `Last session: ${formatDistanceToNow(stats.lastSessionDate, { addSuffix: true })}`
+    : undefined;
+
   const items = [
-    { icon: Activity, label: "Sessions This Week", value: stats.sessionsThisWeek.toString(), color: "text-primary" },
+    { icon: Activity, label: "Sessions This Week", value: stats.sessionsThisWeek.toString(), color: "text-primary", subtitle: sessionsSubtitle },
     { icon: Heart, label: "Avg HR This Week", value: stats.avgHR ? `${stats.avgHR} bpm` : "—", color: "text-destructive" },
     { icon: Clock, label: "Minutes This Week", value: `${stats.totalMinutes}`, color: "text-blue-500" },
     { icon: Flame, label: "Day Streak", value: stats.streak.toString(), color: "text-orange-500" },
@@ -89,6 +98,9 @@ export const QuickStatsRow = () => {
               <div>
                 <p className="text-2xl font-bold">{item.value}</p>
                 <p className="text-xs text-muted-foreground">{item.label}</p>
+                {item.subtitle && (
+                  <p className="text-[10px] text-muted-foreground/70 mt-0.5">{item.subtitle}</p>
+                )}
               </div>
             </div>
           </CardContent>

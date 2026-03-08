@@ -16,6 +16,9 @@ interface Preferences {
   theme: string;
   notifications: boolean;
   autoplay: boolean;
+  sessionReminders: boolean;
+  achievementAlerts: boolean;
+  weeklySummaryEmails: boolean;
 }
 
 const Settings = () => {
@@ -26,6 +29,9 @@ const Settings = () => {
     theme: "dark",
     notifications: true,
     autoplay: true,
+    sessionReminders: true,
+    achievementAlerts: true,
+    weeklySummaryEmails: false,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -61,10 +67,14 @@ const Settings = () => {
       setDisplayName(data.display_name ?? "");
       setAvatarUrl(data.avatar_url ?? "");
       if (data.preferences && typeof data.preferences === "object" && !Array.isArray(data.preferences)) {
+        const p = data.preferences as Record<string, unknown>;
         setPreferences({
-          theme: (data.preferences as Record<string, unknown>).theme as string ?? "dark",
-          notifications: (data.preferences as Record<string, unknown>).notifications as boolean ?? true,
-          autoplay: (data.preferences as Record<string, unknown>).autoplay as boolean ?? true,
+          theme: p.theme as string ?? "dark",
+          notifications: p.notifications as boolean ?? true,
+          autoplay: p.autoplay as boolean ?? true,
+          sessionReminders: p.sessionReminders as boolean ?? true,
+          achievementAlerts: p.achievementAlerts as boolean ?? true,
+          weeklySummaryEmails: p.weeklySummaryEmails as boolean ?? false,
         });
       }
     }
@@ -193,7 +203,50 @@ const Settings = () => {
           </CardContent>
         </Card>
 
-        {/* Push Notifications */}
+        {/* Notification Preferences */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="w-5 h-5 text-primary" />
+              Notification Preferences
+            </CardTitle>
+            <CardDescription>Choose which notifications you receive</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Session Reminders</p>
+                <p className="text-sm text-muted-foreground">Get reminded to start your daily session</p>
+              </div>
+              <Switch
+                checked={preferences.sessionReminders}
+                onCheckedChange={(v) => setPreferences((p) => ({ ...p, sessionReminders: v }))}
+              />
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Achievement Alerts</p>
+                <p className="text-sm text-muted-foreground">Be notified when you earn badges or hit streaks</p>
+              </div>
+              <Switch
+                checked={preferences.achievementAlerts}
+                onCheckedChange={(v) => setPreferences((p) => ({ ...p, achievementAlerts: v }))}
+              />
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Weekly Summary Emails</p>
+                <p className="text-sm text-muted-foreground">Receive a weekly email with your session stats</p>
+              </div>
+              <Switch
+                checked={preferences.weeklySummaryEmails}
+                onCheckedChange={(v) => setPreferences((p) => ({ ...p, weeklySummaryEmails: v }))}
+              />
+            </div>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
