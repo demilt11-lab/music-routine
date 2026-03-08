@@ -33,6 +33,8 @@ async function testConnectivity(): Promise<boolean> {
   return false;
 }
 
+const isPreviewEnv = typeof window !== "undefined" && (window.location.hostname.includes("lovableproject.com") || window.location.hostname === "localhost");
+
 export const ConnectionStatusBanner = forwardRef<HTMLDivElement>((_, ref) => {
   const [isOffline, setIsOffline] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -40,6 +42,9 @@ export const ConnectionStatusBanner = forwardRef<HTMLDivElement>((_, ref) => {
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wasOffline = useRef(false);
   const hasPassedGrace = useRef(false);
+
+  // In preview/dev environments, never show the offline banner
+  if (isPreviewEnv) return null;
 
   const runConnectivityCheck = async (source: "event" | "manual") => {
     const elapsed = Date.now() - mountTime.current;
