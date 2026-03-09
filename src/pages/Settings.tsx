@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTheme } from "next-themes";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { ArrowLeft, Bell, ChevronRight, Loader2, Music, Save, ThumbsUp, User } from "lucide-react";
+import { ArrowLeft, Bell, ChevronRight, Loader2, Moon, Music, Palette, Save, Sun, ThumbsUp, User } from "lucide-react";
 import NotificationSettings from "@/components/notifications/NotificationSettings";
 import type { User as SupaUser } from "@supabase/supabase-js";
 
