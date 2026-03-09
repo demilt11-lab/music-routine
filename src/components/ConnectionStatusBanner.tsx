@@ -35,7 +35,7 @@ async function testConnectivity(): Promise<boolean> {
 
 const isPreviewEnv = typeof window !== "undefined" && (() => {
   const host = window.location.hostname;
-  return host === "localhost" || host.includes("lovableproject.com") || host.startsWith("id-preview--");
+  return host === "localhost" || host.includes("lovableproject.com") || host.includes("lovable.app") || host.startsWith("id-preview--");
 })();
 
 export const ConnectionStatusBanner = forwardRef<HTMLDivElement>((_, ref) => {
