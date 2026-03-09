@@ -33,7 +33,10 @@ async function testConnectivity(): Promise<boolean> {
   return false;
 }
 
-const isPreviewEnv = typeof window !== "undefined" && (window.location.hostname.includes("lovableproject.com") || window.location.hostname === "localhost");
+const isPreviewEnv = typeof window !== "undefined" && (() => {
+  const host = window.location.hostname;
+  return host === "localhost" || host.includes("lovableproject.com") || host.startsWith("id-preview--");
+})();
 
 export const ConnectionStatusBanner = forwardRef<HTMLDivElement>((_, ref) => {
   const [isOffline, setIsOffline] = useState(false);
