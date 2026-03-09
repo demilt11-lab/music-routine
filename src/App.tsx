@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
+import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -76,37 +77,39 @@ const App = () => {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <ConnectionStatusBanner />
-          <ScrollToTop />
-          <div className="min-h-screen pb-16 md:pb-0">
-            <ErrorBoundary>
-              <Suspense fallback={<PageLoader />}>
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/history" element={<SessionHistory />} />
-                  <Route path="/insights" element={<WeeklyInsights />} />
-                  <Route path="/monthly" element={<MonthlyProgress />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/feedback" element={<TrackFeedback />} />
-                  <Route path="/app" element={<AppListing />} />
-                  <Route path="/install" element={<Install />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </Suspense>
-            </ErrorBoundary>
-            <MobileNavBar />
-            <IOSInstallPrompt />
-          </div>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <ConnectionStatusBanner />
+            <ScrollToTop />
+            <div className="min-h-screen pb-16 md:pb-0">
+              <ErrorBoundary>
+                <Suspense fallback={<PageLoader />}>
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/auth" element={<Auth />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/history" element={<SessionHistory />} />
+                    <Route path="/insights" element={<WeeklyInsights />} />
+                    <Route path="/monthly" element={<MonthlyProgress />} />
+                    <Route path="/settings" element={<Settings />} />
+                    <Route path="/feedback" element={<TrackFeedback />} />
+                    <Route path="/app" element={<AppListing />} />
+                    <Route path="/install" element={<Install />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </Suspense>
+              </ErrorBoundary>
+              <MobileNavBar />
+              <IOSInstallPrompt />
+            </div>
+          </BrowserRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 };
 

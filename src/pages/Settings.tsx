@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTheme } from "next-themes";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { ArrowLeft, Bell, ChevronRight, Loader2, Music, Save, ThumbsUp, User } from "lucide-react";
+import { ArrowLeft, Bell, ChevronRight, Loader2, Moon, Music, Palette, Save, Sun, ThumbsUp, User } from "lucide-react";
 import NotificationSettings from "@/components/notifications/NotificationSettings";
 import type { User as SupaUser } from "@supabase/supabase-js";
 
@@ -36,6 +37,7 @@ const Settings = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const navigate = useNavigate();
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
@@ -168,6 +170,39 @@ const Settings = () => {
                   onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                 />
               )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Appearance */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Palette className="w-5 h-5 text-primary" />
+              Appearance
+            </CardTitle>
+            <CardDescription>Choose your preferred theme</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { value: "light", label: "Light", icon: Sun },
+                { value: "dark", label: "Dark", icon: Moon },
+                { value: "system", label: "System", icon: Palette },
+              ].map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  onClick={() => setTheme(value)}
+                  className={`flex flex-col items-center gap-2 rounded-lg border p-4 transition-colors ${
+                    theme === value
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-card text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="text-sm font-medium">{label}</span>
+                </button>
+              ))}
             </div>
           </CardContent>
         </Card>
