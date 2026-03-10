@@ -112,20 +112,18 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { data: user, isLoading: userLoading } = useCurrentUser();
+  // Gate all data fetching on auth readiness
+  const { user, isReady } = useAuthReady();
   const { data: activityTypes = [] } = useActivityTypes();
   const { data: profile } = useUserProfile(user?.id);
   const { data: playlists = [] } = useRecentPlaylists(user?.id);
 
+  // Redirect to auth if session is ready but no user
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session?.user) {
-        navigate("/auth", { replace: true });
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    if (isReady && !user) {
+      navigate("/auth", { replace: true });
+    }
+  }, [isReady, user, navigate]);
 
   const handleGeneratePlaylist = async (activityName: string) => {
     setGeneratingFor(activityName);
