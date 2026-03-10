@@ -94,7 +94,7 @@ export function useBiometricTracking(): UseBiometricTrackingReturn {
     flowState: "none",
   });
   
-  const trackingInterval = useRef<NodeJS.Timeout | null>(null);
+  const trackingInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const currentSessionId = useRef<string | null>(null);
 
   const updateAverages = useCallback((readings: BiometricReading[]) => {

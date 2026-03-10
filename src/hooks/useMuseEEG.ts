@@ -72,7 +72,7 @@ export function useMuseEEG(): UseMuseEEGReturn {
   const eegCallbackRef = useRef<((reading: EEGReading) => void) | null>(null);
   const characteristicsRef = useRef<any[]>([]);
   const eegBufferRef = useRef<number[][]>([[], [], [], []]);
-  const processingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const processingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const onEEGUpdate = useCallback((callback: (reading: EEGReading) => void) => {
     eegCallbackRef.current = callback;

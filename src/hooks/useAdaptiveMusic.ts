@@ -62,7 +62,7 @@ export function useAdaptiveMusic(activityType: string = "study") {
   });
 
   const biometricHistory = useRef<BiometricState[]>([]);
-  const updateInterval = useRef<NodeJS.Timeout | null>(null);
+  const updateInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastBiometricState = useRef<BiometricState | null>(null);
   const currentSongRef = useRef<CurrentSong | null>(null);
 
