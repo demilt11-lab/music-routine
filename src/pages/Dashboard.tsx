@@ -29,7 +29,8 @@ import { ChartSkeleton } from "@/components/skeletons/ListSkeleton";
 const BiometricCharts = lazy(() => import("@/components/biometrics/BiometricCharts").then(m => ({ default: m.BiometricCharts })));
 const PersonalizedInsights = lazy(() => import("@/components/biometrics/PersonalizedInsights").then(m => ({ default: m.PersonalizedInsights })));
 const SmartScheduler = lazy(() => import("@/components/scheduling/SmartScheduler").then(m => ({ default: m.SmartScheduler })));
-import { useCurrentUser, useActivityTypes, useUserProfile, useRecentPlaylists } from "@/hooks/useDashboardData";
+import { useActivityTypes, useUserProfile, useRecentPlaylists } from "@/hooks/useDashboardData";
+import { useAuthReady } from "@/hooks/useAuthReady";
 import { useQueryClient } from "@tanstack/react-query";
 import { QuickLogButton } from "@/components/dashboard/QuickLogButton";
 import type { User } from "@supabase/supabase-js";
@@ -111,20 +112,18 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { data: user, isLoading: userLoading } = useCurrentUser();
+  // Gate all data fetching on auth readiness
+  const { user, isReady } = useAuthReady();
   const { data: activityTypes = [] } = useActivityTypes();
   const { data: profile } = useUserProfile(user?.id);
   const { data: playlists = [] } = useRecentPlaylists(user?.id);
 
+  // Redirect to auth if session is ready but no user
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session?.user) {
-        navigate("/auth", { replace: true });
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    if (isReady && !user) {
+      navigate("/auth", { replace: true });
+    }
+  }, [isReady, user, navigate]);
 
   const handleGeneratePlaylist = async (activityName: string) => {
     setGeneratingFor(activityName);
@@ -156,7 +155,7 @@ const Dashboard = () => {
     navigate("/");
   };
 
-  if (userLoading) {
+  if (!isReady) {
     return <DashboardSkeleton />;
   }
 
