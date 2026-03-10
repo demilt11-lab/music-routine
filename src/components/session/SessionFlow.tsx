@@ -156,7 +156,7 @@ export const SessionFlow = forwardRef<HTMLDivElement>((_, ref) => {
 
   // Timer for active session with milestone notifications
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval> | undefined;
     if (step === "active" && startTime) {
       interval = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTime.getTime()) / 1000);

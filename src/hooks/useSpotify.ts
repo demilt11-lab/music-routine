@@ -68,7 +68,7 @@ export function useSpotify(onTrackPlay?: (track: SpotifyTrack) => void) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const playerRef = useRef<any>(null);
   const deviceIdRef = useRef<string | null>(null);
-  const progressInterval = useRef<NodeJS.Timeout | null>(null);
+  const progressInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const onTrackPlayRef = useRef(onTrackPlay);
   onTrackPlayRef.current = onTrackPlay;
 

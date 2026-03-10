@@ -167,7 +167,7 @@ export const RecommendationEngine = forwardRef<HTMLDivElement>((_, ref) => {
   // Real-time biometric integration
   const [isRealTimeEnabled, setIsRealTimeEnabled] = useState(false);
   const [biometricAdjustment, setBiometricAdjustment] = useState<BiometricAdjustment | null>(null);
-  const realTimeInterval = useRef<NodeJS.Timeout | null>(null);
+  const realTimeInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   
   // Goal setting
   const [flowGoal, setFlowGoal] = useState<FlowGoal>({
