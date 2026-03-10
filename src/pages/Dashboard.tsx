@@ -155,7 +155,7 @@ const Dashboard = () => {
     navigate("/");
   };
 
-  if (userLoading) {
+  if (!isReady) {
     return <DashboardSkeleton />;
   }
 
