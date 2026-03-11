@@ -11,7 +11,8 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ArrowLeft, Bell, ChevronRight, Loader2, Moon, Music, Palette, Save, Sun, ThumbsUp, User } from "lucide-react";
 import NotificationSettings from "@/components/notifications/NotificationSettings";
-import type { User as SupaUser } from "@supabase/supabase-js";
+import { useAuthReady } from "@/hooks/useAuthReady";
+import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
 
 interface Preferences {
   theme: string;
