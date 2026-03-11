@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuthReady } from "@/hooks/useAuthReady";
+import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
 import {
   ArrowLeft, Calendar, Clock, Heart, Brain, Music, 
   TrendingUp, Filter, BarChart3, Activity, Moon,
