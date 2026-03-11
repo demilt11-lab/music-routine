@@ -105,6 +105,8 @@ const Settings = () => {
     );
   }
 
+  if (!isReady) return <DashboardSkeleton />;
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border">
