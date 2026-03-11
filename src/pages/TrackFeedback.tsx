@@ -65,6 +65,8 @@ const TrackFeedback = () => {
   const likedCount = feedback.filter((f) => f.feedback === "up").length;
   const dislikedCount = feedback.filter((f) => f.feedback === "down").length;
 
+  if (!isReady) return <DashboardSkeleton />;
+
   return (
     <div className="min-h-screen bg-background dark">
       <div className="max-w-3xl mx-auto px-4 py-8">
