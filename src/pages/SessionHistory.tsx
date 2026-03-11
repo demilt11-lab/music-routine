@@ -227,6 +227,8 @@ export default function SessionHistory() {
       : 0,
   };
 
+  if (!isReady) return <DashboardSkeleton />;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
