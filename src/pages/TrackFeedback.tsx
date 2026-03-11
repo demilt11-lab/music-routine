@@ -33,10 +33,8 @@ const TrackFeedback = () => {
     if (user) loadFeedback();
   }, [user]);
 
-  if (!isReady) return <DashboardSkeleton />;
-
   const loadFeedback = async () => {
-    if (!user) return;
+    if (!isReady || !user) return;
 
     const { data, error } = await supabase
       .from("track_feedback")
