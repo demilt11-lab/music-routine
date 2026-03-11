@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ThumbsUp, ThumbsDown, Trash2, Music } from "lucide-react";
 import { toast } from "sonner";
+import { useAuthReady } from "@/hooks/useAuthReady";
+import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
 
 interface FeedbackRow {
   id: string;
@@ -18,20 +20,23 @@ interface FeedbackRow {
 
 const TrackFeedback = () => {
   const navigate = useNavigate();
+  const { user, isReady } = useAuthReady();
   const [feedback, setFeedback] = useState<FeedbackRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "up" | "down">("all");
 
   useEffect(() => {
-    loadFeedback();
-  }, []);
+    if (isReady && !user) navigate("/auth");
+  }, [isReady, user, navigate]);
+
+  useEffect(() => {
+    if (user) loadFeedback();
+  }, [user]);
+
+  if (!isReady) return <DashboardSkeleton />;
 
   const loadFeedback = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      navigate("/auth");
-      return;
-    }
+    if (!user) return;
 
     const { data, error } = await supabase
       .from("track_feedback")

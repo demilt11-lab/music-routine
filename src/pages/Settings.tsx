@@ -24,7 +24,7 @@ interface Preferences {
 }
 
 const Settings = () => {
-  const [user, setUser] = useState<SupaUser | null>(null);
+  const { user, isReady } = useAuthReady();
   const [displayName, setDisplayName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [preferences, setPreferences] = useState<Preferences>({
@@ -41,22 +41,14 @@ const Settings = () => {
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      setUser(session?.user ?? null);
-      if (!session?.user) navigate("/auth");
-    });
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (!session?.user) navigate("/auth");
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    if (isReady && !user) navigate("/auth");
+  }, [isReady, user, navigate]);
 
   useEffect(() => {
     if (user) fetchProfile();
   }, [user]);
+
+  if (!isReady) return <DashboardSkeleton />;
 
   const fetchProfile = async () => {
     setIsLoading(true);

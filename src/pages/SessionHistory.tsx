@@ -83,6 +83,7 @@ const moodIcons: Record<string, React.ReactNode> = {
 
 export default function SessionHistory() {
   const navigate = useNavigate();
+  const { user, isReady } = useAuthReady();
   const [sessions, setSessions] = useState<SessionWithBiometrics[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<"7d" | "30d" | "90d">("30d");
@@ -90,16 +91,18 @@ export default function SessionHistory() {
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchSessionHistory();
-  }, [timeRange]);
+    if (isReady && !user) navigate("/auth");
+  }, [isReady, user, navigate]);
+
+  useEffect(() => {
+    if (user) fetchSessionHistory();
+  }, [user, timeRange]);
+
+  if (!isReady) return <DashboardSkeleton />;
 
   const fetchSessionHistory = async () => {
     setIsLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setIsLoading(false);
-      return;
-    }
+    if (!user) return;
 
     const days = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90;
     const startDate = subDays(new Date(), days);
