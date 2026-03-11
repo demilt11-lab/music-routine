@@ -48,10 +48,8 @@ const Settings = () => {
     if (user) fetchProfile();
   }, [user]);
 
-  if (!isReady) return <DashboardSkeleton />;
-
   const fetchProfile = async () => {
-    setIsLoading(true);
+    if (!isReady || !user) return;
     const { data, error } = await supabase
       .from("profiles")
       .select("display_name, avatar_url, preferences")
