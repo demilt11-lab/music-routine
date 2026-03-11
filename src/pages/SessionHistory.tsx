@@ -98,11 +98,9 @@ export default function SessionHistory() {
     if (user) fetchSessionHistory();
   }, [user, timeRange]);
 
-  if (!isReady) return <DashboardSkeleton />;
-
   const fetchSessionHistory = async () => {
+    if (!isReady || !user) return;
     setIsLoading(true);
-    if (!user) return;
 
     const days = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90;
     const startDate = subDays(new Date(), days);
