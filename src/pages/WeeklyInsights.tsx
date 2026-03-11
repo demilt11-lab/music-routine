@@ -1,33 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Music, ArrowLeft } from "lucide-react";
 import { WeeklyInsightsDashboard } from "@/components/analytics/WeeklyInsightsDashboard";
+import { useAuthReady } from "@/hooks/useAuthReady";
+import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
 
 const WeeklyInsights = () => {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, isReady } = useAuthReady();
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
-        navigate("/auth");
-      }
-      setIsLoading(false);
-    };
-    
-    checkAuth();
-  }, [navigate]);
+    if (isReady && !user) navigate("/auth");
+  }, [isReady, user, navigate]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    );
-  }
+  if (!isReady) return <DashboardSkeleton />;
 
   return (
     <div className="min-h-screen bg-background">

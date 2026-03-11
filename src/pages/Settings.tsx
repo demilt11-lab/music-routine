@@ -11,7 +11,8 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ArrowLeft, Bell, ChevronRight, Loader2, Moon, Music, Palette, Save, Sun, ThumbsUp, User } from "lucide-react";
 import NotificationSettings from "@/components/notifications/NotificationSettings";
-import type { User as SupaUser } from "@supabase/supabase-js";
+import { useAuthReady } from "@/hooks/useAuthReady";
+import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
 
 interface Preferences {
   theme: string;
@@ -23,7 +24,7 @@ interface Preferences {
 }
 
 const Settings = () => {
-  const [user, setUser] = useState<SupaUser | null>(null);
+  const { user, isReady } = useAuthReady();
   const [displayName, setDisplayName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [preferences, setPreferences] = useState<Preferences>({
@@ -40,25 +41,15 @@ const Settings = () => {
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      setUser(session?.user ?? null);
-      if (!session?.user) navigate("/auth");
-    });
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (!session?.user) navigate("/auth");
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    if (isReady && !user) navigate("/auth");
+  }, [isReady, user, navigate]);
 
   useEffect(() => {
     if (user) fetchProfile();
   }, [user]);
 
   const fetchProfile = async () => {
-    setIsLoading(true);
+    if (!isReady || !user) return;
     const { data, error } = await supabase
       .from("profiles")
       .select("display_name, avatar_url, preferences")
@@ -113,6 +104,8 @@ const Settings = () => {
       </div>
     );
   }
+
+  if (!isReady) return <DashboardSkeleton />;
 
   return (
     <div className="min-h-screen bg-background">

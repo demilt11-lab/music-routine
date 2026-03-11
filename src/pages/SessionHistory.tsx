@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuthReady } from "@/hooks/useAuthReady";
+import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
 import {
   ArrowLeft, Calendar, Clock, Heart, Brain, Music, 
   TrendingUp, Filter, BarChart3, Activity, Moon,
@@ -81,6 +83,7 @@ const moodIcons: Record<string, React.ReactNode> = {
 
 export default function SessionHistory() {
   const navigate = useNavigate();
+  const { user, isReady } = useAuthReady();
   const [sessions, setSessions] = useState<SessionWithBiometrics[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<"7d" | "30d" | "90d">("30d");
@@ -88,16 +91,16 @@ export default function SessionHistory() {
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchSessionHistory();
-  }, [timeRange]);
+    if (isReady && !user) navigate("/auth");
+  }, [isReady, user, navigate]);
+
+  useEffect(() => {
+    if (user) fetchSessionHistory();
+  }, [user, timeRange]);
 
   const fetchSessionHistory = async () => {
+    if (!isReady || !user) return;
     setIsLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setIsLoading(false);
-      return;
-    }
 
     const days = timeRange === "7d" ? 7 : timeRange === "30d" ? 30 : 90;
     const startDate = subDays(new Date(), days);
@@ -223,6 +226,8 @@ export default function SessionHistory() {
       ? Math.round(sessions.reduce((sum, s) => sum + s.avgHeartRate, 0) / sessions.length)
       : 0,
   };
+
+  if (!isReady) return <DashboardSkeleton />;
 
   return (
     <div className="min-h-screen bg-background">
