@@ -333,3 +333,59 @@ begin
     from public.music_tokens mt
     where mt.user_id = target_user_id;
 end; $$;
+
+-- ---------------------------------------------------------------------------
+-- Insights aggregation (server-side)
+-- Pushes the dashboard/insights rollup into Postgres so the client downloads a
+-- compact summary instead of every session row. SECURITY INVOKER + the
+-- explicit auth.uid() filter mean RLS still applies and the query uses the
+-- (user_id, started_at) index. `daily` is a dense UTC series so the chart
+-- renders an unbroken timeline.
+-- ---------------------------------------------------------------------------
+create or replace function public.get_insights(range_days int default 7)
+returns jsonb
+language sql stable security invoker set search_path = public as $$
+  with durations as (
+    select
+      s.activity,
+      s.avg_flow_score,
+      ((s.started_at at time zone 'utc')::date) as day,
+      greatest(0, coalesce(extract(epoch from (s.ended_at - s.started_at)) / 60, 0))::int as minutes
+    from public.sessions s
+    where s.user_id = auth.uid()
+      and s.started_at >= (now() - make_interval(days => range_days))
+  ),
+  by_activity as (
+    select activity, sum(minutes)::int as minutes, count(*)::int as sessions
+    from durations group by activity
+  ),
+  series as (
+    select d::date as day
+    from generate_series(
+      (now() at time zone 'utc')::date - (range_days - 1),
+      (now() at time zone 'utc')::date,
+      interval '1 day'
+    ) as d
+  ),
+  daily as (
+    select to_char(series.day, 'YYYY-MM-DD') as date,
+           coalesce(sum(durations.minutes), 0)::int as minutes
+    from series
+    left join durations on durations.day = series.day
+    group by series.day
+    order by series.day
+  )
+  select jsonb_build_object(
+    'totalSessions', (select count(*) from durations),
+    'totalMinutes',  (select coalesce(sum(minutes), 0) from durations),
+    'avgFlow',       (select avg(avg_flow_score) from durations where avg_flow_score is not null),
+    'byActivity',    (select coalesce(jsonb_agg(jsonb_build_object(
+                        'activity', activity, 'minutes', minutes, 'sessions', sessions)), '[]'::jsonb)
+                      from by_activity),
+    'daily',         (select coalesce(jsonb_agg(jsonb_build_object(
+                        'date', date, 'minutes', minutes)), '[]'::jsonb)
+                      from daily)
+  );
+$$;
+
+grant execute on function public.get_insights(int) to authenticated;
