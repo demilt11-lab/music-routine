@@ -150,9 +150,13 @@ create index session_tracks_session_idx on public.session_tracks (session_id, po
 
 -- ---------------------------------------------------------------------------
 -- biometric_readings  (high-volume time-series telemetry)
+-- Range-partitioned by month: the fastest-growing table (a row every few
+-- seconds per active session). Partitioning keeps indexes small, makes recent
+-- reads hit one partition, and turns retention into an O(1) DROP TABLE instead
+-- of a mass DELETE. A partitioned table's PK must include the partition key.
 -- ---------------------------------------------------------------------------
 create table public.biometric_readings (
-  id                uuid primary key default gen_random_uuid(),
+  id                uuid not null default gen_random_uuid(),
   user_id           uuid not null references auth.users on delete cascade,
   session_id        uuid references public.sessions on delete cascade,
   recorded_at       timestamptz not null default now(),
@@ -168,14 +172,80 @@ create table public.biometric_readings (
   eeg_gamma         real,
   eeg_delta         real,
   device_type       text,
-  created_at        timestamptz not null default now()
-);
+  created_at        timestamptz not null default now(),
+  primary key (id, recorded_at)
+) partition by range (recorded_at);
+
 alter table public.biometric_readings enable row level security;
+-- Policies on the partitioned parent apply to all partitions; the app only
+-- ever queries the parent.
 create policy "biometrics: owner read"   on public.biometric_readings for select using (auth.uid() = user_id);
 create policy "biometrics: owner insert" on public.biometric_readings for insert with check (auth.uid() = user_id);
 create policy "biometrics: owner delete" on public.biometric_readings for delete using (auth.uid() = user_id);
+-- Indexes declared on the parent propagate to every (current and future) partition.
 create index biometrics_session_time_idx on public.biometric_readings (session_id, recorded_at desc);
 create index biometrics_user_time_idx    on public.biometric_readings (user_id, recorded_at desc);
+
+-- Catch-all so an insert never fails if the right monthly partition is missing.
+create table public.biometric_readings_default partition of public.biometric_readings default;
+
+-- Idempotently create the monthly partition covering `target`.
+create or replace function public.ensure_biometric_partition(target date)
+returns void language plpgsql set search_path = public as $$
+declare
+  start_month date := date_trunc('month', target)::date;
+  end_month   date := (date_trunc('month', target) + interval '1 month')::date;
+  part_name   text := format('biometric_readings_%s', to_char(start_month, 'YYYYMM'));
+begin
+  if not exists (select 1 from pg_class where relname = part_name) then
+    execute format(
+      'create table public.%I partition of public.biometric_readings for values from (%L) to (%L)',
+      part_name, start_month, end_month
+    );
+  end if;
+end; $$;
+
+-- Retention: drop monthly partitions whose entire range predates the cutoff.
+create or replace function public.drop_old_biometric_partitions(keep_months int default 12)
+returns void language plpgsql set search_path = public as $$
+declare
+  cutoff date := (date_trunc('month', now()) - make_interval(months => keep_months))::date;
+  part   record;
+begin
+  for part in
+    select c.relname
+    from pg_inherits i
+    join pg_class c on c.oid = i.inhrelid
+    where i.inhparent = 'public.biometric_readings'::regclass
+      and c.relname ~ '^biometric_readings_\d{6}$'
+  loop
+    if to_date(right(part.relname, 6), 'YYYYMM') < cutoff then
+      execute format('drop table if exists public.%I', part.relname);
+    end if;
+  end loop;
+end; $$;
+
+-- Pre-create partitions around deploy time (table is empty, so no overlap with
+-- the default partition). A monthly job should create next month's partition
+-- ahead of inserts; until then the default partition absorbs them. With
+-- pg_cron enabled:
+--   select cron.schedule('biometric-partition', '0 0 25 * *',
+--     $$ select public.ensure_biometric_partition((now() + interval '1 month')::date) $$);
+--   select cron.schedule('biometric-retention', '0 3 1 * *',
+--     $$ select public.drop_old_biometric_partitions(12) $$);
+do $$
+declare m date;
+begin
+  for m in
+    select generate_series(
+      date_trunc('month', now()) - interval '1 month',
+      date_trunc('month', now()) + interval '3 months',
+      interval '1 month'
+    )::date
+  loop
+    perform public.ensure_biometric_partition(m);
+  end loop;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- track_feedback  (thumbs up/down — fuels personalised preferences)
