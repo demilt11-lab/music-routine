@@ -32,22 +32,30 @@ export function rawToMicrovolts(raw: number): number {
   return 0.48828125 * (raw - 0x800);
 }
 
-function hann(n: number, length: number): number {
-  return 0.5 * (1 - Math.cos((2 * Math.PI * n) / (length - 1)));
+// Hann windows are identical for a given length, so build each once and reuse
+// across every band, frequency, and emit — instead of recomputing a cos() per
+// sample per frequency.
+const hannWindows = new Map<number, Float64Array>();
+function hannWindow(length: number): Float64Array {
+  let w = hannWindows.get(length);
+  if (!w) {
+    w = new Float64Array(length);
+    for (let i = 0; i < length; i++) w[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (length - 1)));
+    hannWindows.set(length, w);
+  }
+  return w;
 }
 
-/** Power at a single frequency via the Goertzel algorithm. */
-export function goertzelPower(samples: number[], freq: number, sampleRate: number): number {
+/** Power at a single frequency via the Goertzel algorithm (no windowing). */
+export function goertzelPower(samples: ArrayLike<number>, freq: number, sampleRate: number): number {
   const n = samples.length;
   if (n === 0) return 0;
   const k = Math.round((n * freq) / sampleRate);
-  const omega = (2 * Math.PI * k) / n;
-  const coeff = 2 * Math.cos(omega);
+  const coeff = 2 * Math.cos((2 * Math.PI * k) / n);
   let s1 = 0;
   let s2 = 0;
   for (let i = 0; i < n; i++) {
-    const windowed = samples[i] * hann(i, n);
-    const s0 = windowed + coeff * s1 - s2;
+    const s0 = samples[i] + coeff * s1 - s2;
     s2 = s1;
     s1 = s0;
   }
@@ -56,8 +64,16 @@ export function goertzelPower(samples: number[], freq: number, sampleRate: numbe
 
 /** Estimate average band powers (µV²) across the sample window. */
 export function bandPowers(samples: number[], sampleRate = EEG_SAMPLE_RATE): EegBands {
-  const power = (freqs: number[]) =>
-    freqs.reduce((sum, f) => sum + goertzelPower(samples, f, sampleRate), 0) / freqs.length;
+  // Apply the (cached) Hann window once, then run Goertzel over the result.
+  const win = hannWindow(samples.length);
+  const windowed = new Float64Array(samples.length);
+  for (let i = 0; i < samples.length; i++) windowed[i] = samples[i] * win[i];
+
+  const power = (freqs: number[]) => {
+    let sum = 0;
+    for (const f of freqs) sum += goertzelPower(windowed, f, sampleRate);
+    return sum / freqs.length;
+  };
   return {
     delta: power(BAND_FREQS.delta),
     theta: power(BAND_FREQS.theta),

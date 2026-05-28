@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -52,9 +52,14 @@ export default function Session() {
     enabled: biometrics.connected,
   });
 
-  const flowScores = useRef<number[]>([]);
+  // Running mean instead of an ever-growing array — O(1) memory over a session
+  // that may last hours at a 2s sample cadence.
+  const flowAcc = useRef({ sum: 0, count: 0 });
   useEffect(() => {
-    if (biometrics.current) flowScores.current.push(biometrics.flow.score);
+    if (biometrics.current) {
+      flowAcc.current.sum += biometrics.flow.score;
+      flowAcc.current.count += 1;
+    }
   }, [biometrics.current, biometrics.flow.score]);
 
   // Auto-start the simulator so a session is immediately useful; users can
@@ -65,19 +70,18 @@ export default function Session() {
   }, [session]);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const playTrack = (track: Track) => {
+  const playTrack = useCallback((track: Track) => {
     setCurrentTrack(track);
     if (track.previewUrl && audioRef.current) {
       audioRef.current.src = track.previewUrl;
       void audioRef.current.play().catch(() => undefined);
     }
-  };
+  }, []);
 
   const end = async () => {
     biometrics.stop();
-    const avg = flowScores.current.length
-      ? flowScores.current.reduce((s, f) => s + f, 0) / flowScores.current.length
-      : undefined;
+    const { sum, count } = flowAcc.current;
+    const avg = count ? sum / count : undefined;
     try {
       await completeSession.mutateAsync({ id, avgFlowScore: avg });
       toast.success("Session saved");
@@ -233,32 +237,49 @@ export default function Session() {
               <p className="text-sm text-muted-foreground">Pick a track below to start playback.</p>
             )}
 
-            {adaptive.candidates.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">Suggested next</p>
-                {adaptive.candidates.map((track) => (
-                  <button
-                    key={`${track.providerTrackId ?? track.title}-${track.artist}`}
-                    type="button"
-                    onClick={() => playTrack(track)}
-                    className={cn(
-                      "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
-                      currentTrack?.providerTrackId === track.providerTrackId && "bg-muted",
-                    )}
-                  >
-                    <span className="truncate">
-                      {track.title} <span className="text-muted-foreground">· {track.artist}</span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
+            <CandidateList candidates={adaptive.candidates} currentId={currentTrack?.providerTrackId} onPlay={playTrack} />
           </CardContent>
         </Card>
       </div>
     </div>
   );
 }
+
+/**
+ * Memoised so it only re-renders when the candidate set or selection changes —
+ * not on every 2s biometric tick that re-renders the parent.
+ */
+const CandidateList = memo(function CandidateList({
+  candidates,
+  currentId,
+  onPlay,
+}: {
+  candidates: Track[];
+  currentId?: string;
+  onPlay: (track: Track) => void;
+}) {
+  if (candidates.length === 0) return null;
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-muted-foreground">Suggested next</p>
+      {candidates.map((track) => (
+        <button
+          key={`${track.providerTrackId ?? track.title}-${track.artist}`}
+          type="button"
+          onClick={() => onPlay(track)}
+          className={cn(
+            "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
+            currentId === track.providerTrackId && "bg-muted",
+          )}
+        >
+          <span className="truncate">
+            {track.title} <span className="text-muted-foreground">· {track.artist}</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+});
 
 function Metric({ label, value, unit }: { label: string; value?: number | null; unit: string }) {
   return (

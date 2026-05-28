@@ -68,4 +68,18 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    // Split large, stable vendors into their own long-cached chunks so the main
+    // bundle stays small and a deploy only invalidates app code, not React/etc.
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "react-vendor": ["react", "react-dom", "react-router-dom"],
+          "data-vendor": ["@tanstack/react-query", "@supabase/supabase-js"],
+          "chart-vendor": ["recharts"],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 700,
+  },
 }));

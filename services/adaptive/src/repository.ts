@@ -1,6 +1,7 @@
 import { derivePreferences, type FeedbackRecord, type UserPreferences, type Track } from "@biomusic/core";
 import type { BiometricIngestRequest } from "@biomusic/core/contracts";
 import { getServiceClient } from "./supabase.js";
+import { getCache } from "./cache.js";
 
 /**
  * All persistence is funnelled through here and is ALWAYS scoped to the
@@ -8,7 +9,18 @@ import { getServiceClient } from "./supabase.js";
  * is the security boundary — never expose a query that omits it.
  */
 
+// Preferences change only when a user rates a track, but `/adaptive/next` is
+// called every ~15s per active session. Without caching that's one DB read +
+// aggregation per call — millions of needless queries at scale. A short TTL
+// makes it ~1 read per user per window; staleness up to the TTL is harmless
+// because preferences evolve slowly.
+const PREFS_TTL_SECONDS = 180;
+
 export async function getUserPreferences(userId: string): Promise<UserPreferences> {
+  const cacheKey = `prefs:${userId}`;
+  const cached = await getCache().get<UserPreferences>(cacheKey);
+  if (cached) return cached;
+
   const { data, error } = await getServiceClient()
     .from("track_feedback")
     .select("track_artist, feedback, target_tempo, target_energy")
@@ -23,7 +35,9 @@ export async function getUserPreferences(userId: string): Promise<UserPreference
     targetTempo: r.target_tempo as number | null,
     targetEnergy: r.target_energy as number | null,
   }));
-  return derivePreferences(records);
+  const prefs = derivePreferences(records);
+  await getCache().set(cacheKey, prefs, PREFS_TTL_SECONDS);
+  return prefs;
 }
 
 export async function ingestBiometrics(userId: string, req: BiometricIngestRequest): Promise<number> {
