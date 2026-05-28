@@ -178,7 +178,7 @@ async function handleDigest(admin: any, vapidPublicKey: string, vapidPrivateKey:
 
   for (const [userId, subs] of userSubs) {
     const { data: sessions } = await admin
-      .from("listening_sessions")
+      .from("sessions")
       .select("id, started_at, ended_at")
       .eq("user_id", userId)
       .gte("started_at", oneWeekAgo);

@@ -1,73 +1,80 @@
-# Welcome to your Lovable project
+# BioMusic
 
-## Project info
+Music that adapts to your body in real time. BioMusic reads biometric signals
+(heart rate, HRV, stress, focus, EEG) and steers your soundtrack toward your
+optimal **flow state** for workouts, focus, sleep, and more.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+This is an npm-workspace monorepo with a hybrid backend. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full system design.
 
-## How can I edit this code?
+## Workspaces
 
-There are several ways of editing your application.
+| Path | Package | What it is |
+|------|---------|------------|
+| `/` | `@biomusic/web` | React + Vite PWA (Capacitor for native) |
+| `packages/core` | `@biomusic/core` | Shared, pure-TS adaptive engine + API contracts |
+| `services/adaptive` | `@biomusic/adaptive` | Stateless Hono service (recommendations, AI, providers) |
+| `supabase/` | — | v2 schema migration + edge functions |
 
-**Use Lovable**
+## Prerequisites
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+- Node 22+
+- A Supabase project (Auth + Postgres)
 
-Changes made via Lovable will be committed automatically to this repo.
+## Setup
 
-**Use your preferred IDE**
+```bash
+npm install                       # installs all workspaces
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+# Web app config
+cp .env.example .env              # fill in Supabase URL + publishable key
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+# Adaptive service config
+cp services/adaptive/.env.example services/adaptive/.env
 ```
 
-**Edit a file directly in GitHub**
+Apply the database schema to your Supabase project (fresh project recommended):
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+supabase db reset                 # runs supabase/migrations/*.sql
+```
 
-**Use GitHub Codespaces**
+## Develop
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```bash
+npm run dev                       # web app on http://localhost:8080
+npm run dev:service               # adaptive service on http://localhost:8787
+```
 
-## What technologies are used for this project?
+The web app works without the service running — it falls back to the
+deterministic engine bundled in `@biomusic/core`.
 
-This project is built with:
+## Quality gates
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```bash
+npm run typecheck                 # web app
+npm run build:core                # type-check the shared package
+npm run build:service             # type-check + bundle the service
+npm test                          # unit tests (core engine + service)
+npm run build                     # production web build
+```
 
-## How can I deploy this project?
+## Deploy
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+- **Web:** static build (`npm run build`) to any CDN/static host. PWA-installable.
+- **Service:** container (`services/adaptive/Dockerfile`) to Cloud Run / Fly /
+  Render. Build from the repo root:
+  ```bash
+  docker build -f services/adaptive/Dockerfile -t biomusic-adaptive .
+  ```
+- **Database + Edge Functions:** Supabase (`supabase db push`,
+  `supabase functions deploy`).
 
-## Can I connect a custom domain to my Lovable project?
+## Generating typed DB types (optional)
 
-Yes, you can!
+The web client types Supabase results at the API boundary. For end-to-end
+generic typing, generate types and pass them to `createClient<Database>`:
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+```bash
+supabase gen types typescript --project-id <id> > src/lib/database.types.ts
+```
