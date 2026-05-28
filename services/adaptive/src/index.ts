@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
+import { compress } from "hono/compress";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { requestId } from "hono/request-id";
@@ -19,6 +20,9 @@ const app = new Hono<AuthContext>();
 
 app.use("*", requestId());
 app.use("*", logger());
+// Gzip JSON responses (recommendations, candidate lists, playlists) to cut
+// egress and time-to-first-byte over the wire.
+app.use("*", compress());
 app.use(
   "*",
   cors({
@@ -30,18 +34,25 @@ app.use(
 );
 
 // Liveness/readiness — unauthenticated, used by load balancers and uptime checks.
-app.get("/health", (c) =>
-  c.json({
+app.get("/health", (c) => {
+  c.header("Cache-Control", "no-store");
+  return c.json({
     status: "ok",
     llm: isLlmEnabled(),
     providers: listConfiguredProviders(),
     version: "1.0.0",
-  }),
-);
+  });
+});
 
 // Everything under /v1 requires a valid Supabase JWT.
 const v1 = new Hono<AuthContext>();
 v1.use("*", requireAuth);
+// User-specific by default → never store in shared caches. Routes that serve
+// non-user-specific data (provider search) opt back into caching themselves.
+v1.use("*", async (c, next) => {
+  c.header("Cache-Control", "no-store");
+  await next();
+});
 v1.route("/adaptive", adaptiveRoutes);
 v1.route("/playlists", playlistRoutes);
 v1.route("/biometrics", biometricRoutes);

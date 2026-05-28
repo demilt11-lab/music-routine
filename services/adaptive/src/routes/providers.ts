@@ -26,5 +26,9 @@ providerRoutes.get("/:provider/search", rateLimit({ name: "providers", limit: 90
     energy:
       query.energyMin != null && query.energyMax != null ? { min: query.energyMin, max: query.energyMax } : undefined,
   });
+  // Catalogue results depend only on the query, not the user, so they're safe
+  // to cache in a shared/CDN layer keyed by URL. `s-maxage` targets the CDN;
+  // `max-age` the browser. Configure the edge to cache this path by URL.
+  c.header("Cache-Control", "public, max-age=60, s-maxage=600");
   return c.json({ provider: provider.id, tracks });
 });
