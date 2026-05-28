@@ -2,11 +2,26 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { deriveFlowState, getActivityTarget, type Activity, type BiometricSample, type FlowState } from "@biomusic/core";
 import { adaptiveClient } from "@/lib/adaptive-client";
 import { SimulatedSource, WebBluetoothHeartRateSource, type BiometricSource } from "./source";
+import { HealthKitSource } from "./healthkit-source";
+import { MuseEegSource } from "./muse-source";
 
 const MAX_HISTORY = 60;
 const FLUSH_INTERVAL_MS = 10_000;
 
-export type SourceId = "simulated" | "ble-heart-rate";
+export type SourceId = "simulated" | "ble-heart-rate" | "healthkit" | "muse-eeg";
+
+function createSource(id: SourceId, activity: Activity): BiometricSource {
+  switch (id) {
+    case "ble-heart-rate":
+      return new WebBluetoothHeartRateSource();
+    case "healthkit":
+      return new HealthKitSource();
+    case "muse-eeg":
+      return new MuseEegSource();
+    default:
+      return new SimulatedSource(activity);
+  }
+}
 
 interface Options {
   activity: Activity;
@@ -77,8 +92,7 @@ export function useBiometrics({ activity, sessionId }: Options): BiometricsState
     async (id: SourceId) => {
       setError(null);
       sourceRef.current?.stop();
-      const source: BiometricSource =
-        id === "ble-heart-rate" ? new WebBluetoothHeartRateSource() : new SimulatedSource(activity);
+      const source = createSource(id, activity);
       try {
         await source.start(handleSample);
         sourceRef.current = source;

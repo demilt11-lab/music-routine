@@ -3,7 +3,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   Bluetooth,
+  Brain,
   Cpu,
+  HeartPulse,
   Loader2,
   ThumbsDown,
   ThumbsUp,
@@ -18,7 +20,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { useSession, useCompleteSession } from "@/features/sessions/hooks";
-import { useBiometrics, type SourceId } from "@/features/biometrics/useBiometrics";
+import { useBiometrics } from "@/features/biometrics/useBiometrics";
+import { HealthKitSource } from "@/features/biometrics/healthkit-source";
 import { useAdaptiveSession } from "@/features/adaptive/useAdaptiveSession";
 import { useSubmitFeedback } from "@/features/feedback/hooks";
 
@@ -143,9 +146,22 @@ export default function Session() {
             <Progress value={flowPct} />
             <div className="grid grid-cols-3 gap-3 pt-2">
               <Metric label="Heart rate" value={biometrics.current?.heartRate} unit="bpm" />
-              <Metric label="Stress" value={biometrics.current?.stressLevel} unit="%" />
+              <Metric
+                label={biometrics.current?.eeg ? "Meditation" : "Stress"}
+                value={biometrics.current?.eeg ? biometrics.current?.meditationScore : biometrics.current?.stressLevel}
+                unit="%"
+              />
               <Metric label="Focus" value={biometrics.current?.focusScore} unit="%" />
             </div>
+            {biometrics.current?.eeg && (
+              <div className="flex flex-wrap justify-between gap-x-3 gap-y-1 pt-1 text-[11px] text-muted-foreground">
+                {(["delta", "theta", "alpha", "beta", "gamma"] as const).map((band) => (
+                  <span key={band} className="capitalize">
+                    {band} {biometrics.current!.eeg![band].toFixed(0)}
+                  </span>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -155,9 +171,13 @@ export default function Session() {
             {biometrics.connected ? <Wifi className="h-4 w-4 text-primary" /> : <WifiOff className="h-4 w-4 text-muted-foreground" />}
             <span className="text-muted-foreground">{biometrics.connected ? "Streaming" : "Disconnected"}</span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             <SourceButton icon={Cpu} active={biometrics.sourceId === "simulated"} onClick={() => biometrics.start("simulated")} label="Simulated" />
-            <SourceButton icon={Bluetooth} active={biometrics.sourceId === "ble-heart-rate"} onClick={() => biometrics.start("ble-heart-rate")} label="Bluetooth" />
+            <SourceButton icon={Bluetooth} active={biometrics.sourceId === "ble-heart-rate"} onClick={() => biometrics.start("ble-heart-rate")} label="Heart rate" />
+            <SourceButton icon={Brain} active={biometrics.sourceId === "muse-eeg"} onClick={() => biometrics.start("muse-eeg")} label="Muse EEG" />
+            {HealthKitSource.isSupported() && (
+              <SourceButton icon={HeartPulse} active={biometrics.sourceId === "healthkit"} onClick={() => biometrics.start("healthkit")} label="Apple Health" />
+            )}
           </div>
         </div>
         {biometrics.error && <p className="text-sm text-destructive">{biometrics.error}</p>}
