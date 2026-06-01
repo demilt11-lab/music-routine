@@ -1,14 +1,37 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  lazy,
+  Suspense,
+} from "react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { 
-  Music, LogOut, Moon, Dumbbell, BookOpen, Coffee, Car, Brain,
-  Sparkles, Loader2, Play, Clock, ListMusic, Headphones, BarChart3, History, Calendar, Settings,
-  ExternalLink
+import {
+  Music,
+  LogOut,
+  Moon,
+  Dumbbell,
+  BookOpen,
+  Coffee,
+  Car,
+  Brain,
+  Sparkles,
+  Play,
+  Clock,
+  ListMusic,
+  Headphones,
+  BarChart3,
+  History,
+  Calendar,
+  Settings,
+  ExternalLink,
 } from "lucide-react";
 import { MusicTabs } from "@/components/music/MusicTabs";
 import { BiometricMonitor } from "@/components/biometrics/BiometricMonitor";
@@ -24,22 +47,36 @@ import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { ChartSkeleton } from "@/components/skeletons/ListSkeleton";
-
-// Lazy-load heavy chart/analytics components
-const BiometricCharts = lazy(() => import("@/components/biometrics/BiometricCharts").then(m => ({ default: m.BiometricCharts })));
-const PersonalizedInsights = lazy(() => import("@/components/biometrics/PersonalizedInsights").then(m => ({ default: m.PersonalizedInsights })));
-const SmartScheduler = lazy(() => import("@/components/scheduling/SmartScheduler").then(m => ({ default: m.SmartScheduler })));
 import { useActivityTypes, useUserProfile, useRecentPlaylists } from "@/hooks/useDashboardData";
 import { useAuthReady } from "@/hooks/useAuthReady";
 import { useQueryClient } from "@tanstack/react-query";
-import { QuickLogButton } from "@/components/dashboard/QuickLogButton";
-import type { User } from "@supabase/supabase-js";
+
+const QuickLogButton = lazy(() =>
+  import("@/components/dashboard/QuickLogButton").then((m) => ({
+    default: m.QuickLogButton,
+  }))
+);
+const BiometricCharts = lazy(() =>
+  import("@/components/biometrics/BiometricCharts").then((m) => ({
+    default: m.BiometricCharts,
+  }))
+);
+const PersonalizedInsights = lazy(() =>
+  import("@/components/biometrics/PersonalizedInsights").then((m) => ({
+    default: m.PersonalizedInsights,
+  }))
+);
+const SmartScheduler = lazy(() =>
+  import("@/components/scheduling/SmartScheduler").then((m) => ({
+    default: m.SmartScheduler,
+  }))
+);
 
 interface GeneratedPlaylist {
   id: string;
   name: string;
   description: string;
-  song_recommendations: any[];
+  song_recommendations: unknown[];
   ai_reasoning: string;
   created_at: string;
   activity_types: { name: string };
@@ -50,6 +87,12 @@ interface CuratedPlaylist {
   description: string;
   spotifyQuery: string;
   youtubeQuery: string;
+}
+
+interface ActivityType {
+  id: string;
+  name: string;
+  description: string;
 }
 
 const curatedPlaylists: Record<string, CuratedPlaylist[]> = {
@@ -97,111 +140,347 @@ const curatedPlaylists: Record<string, CuratedPlaylist[]> = {
   ],
 };
 
-const activityIcons: Record<string, React.ReactNode> = {
-  sleep: <Moon className="w-6 h-6" />,
-  workout: <Dumbbell className="w-6 h-6" />,
-  study: <BookOpen className="w-6 h-6" />,
-  relax: <Coffee className="w-6 h-6" />,
-  commute: <Car className="w-6 h-6" />,
-  meditation: <Brain className="w-6 h-6" />,
+const activityIconMap: Record<string, typeof Moon> = {
+  sleep: Moon,
+  workout: Dumbbell,
+  study: BookOpen,
+  relax: Coffee,
+  commute: Car,
+  meditation: Brain,
 };
 
+const chartFallback = <ChartSkeleton />;
+
+const DashboardHeader = memo(function DashboardHeader({
+  email,
+  onNavigate,
+  onLogout,
+}: {
+  email?: string;
+  onNavigate: (path: string) => void;
+  onLogout: () => void;
+}) {
+  return (
+    <header className="border-b border-border">
+      <div className="container mx-auto flex items-center justify-between px-4 py-4">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+            <Music className="h-4 w-4 text-primary-foreground" />
+          </div>
+          <span className="text-lg font-semibold">BioMusic</span>
+        </div>
+
+        <div className="hidden items-center gap-4 md:flex">
+          <Button variant="ghost" size="sm" onClick={() => onNavigate("/insights")}>
+            <BarChart3 className="mr-2 h-4 w-4" />
+            Weekly
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => onNavigate("/monthly")}>
+            <Calendar className="mr-2 h-4 w-4" />
+            Monthly
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => onNavigate("/history")}>
+            <History className="mr-2 h-4 w-4" />
+            History
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => onNavigate("/settings")}>
+            <Settings className="mr-2 h-4 w-4" />
+            Settings
+          </Button>
+          <span className="text-sm text-muted-foreground">{email}</span>
+          <Button variant="ghost" size="sm" onClick={onLogout}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign Out
+          </Button>
+        </div>
+      </div>
+    </header>
+  );
+});
+
+const ActivityPlaylistBrowser = memo(function ActivityPlaylistBrowser({
+  activityTypes,
+  expandedActivity,
+  onToggleActivity,
+}: {
+  activityTypes: ActivityType[];
+  expandedActivity: string | null;
+  onToggleActivity: (activityName: string) => void;
+}) {
+  const expandedPlaylists = useMemo(
+    () => (expandedActivity ? curatedPlaylists[expandedActivity] ?? [] : []),
+    [expandedActivity]
+  );
+
+  const openSpotify = useCallback((query: string) => {
+    window.open(`https://open.spotify.com/search/${encodeURIComponent(query)}`, "_blank", "noopener,noreferrer");
+  }, []);
+
+  const openYoutube = useCallback((query: string) => {
+    window.open(`https://music.youtube.com/search?q=${encodeURIComponent(query)}`, "_blank", "noopener,noreferrer");
+  }, []);
+
+  return (
+    <section className="mb-12">
+      <h2 className="mb-4 text-xl font-semibold">Curated Playlists by Activity</h2>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        {activityTypes.map((activity) => {
+          const isExpanded = expandedActivity === activity.name;
+          const Icon = activityIconMap[activity.name] ?? Music;
+
+          return (
+            <Card
+              key={activity.id}
+              className={cn(
+                "cursor-pointer transition-colors hover:border-primary/50",
+                isExpanded && "border-primary"
+              )}
+              onClick={() => onToggleActivity(activity.name)}
+            >
+              <CardHeader className="pb-2">
+                <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 transition-colors">
+                  <Icon className="h-6 w-6" />
+                </div>
+                <CardTitle className="text-base capitalize">{activity.name}</CardTitle>
+                <CardDescription className="text-xs">{activity.description}</CardDescription>
+              </CardHeader>
+
+              <CardContent>
+                <Button className="w-full" variant={isExpanded ? "secondary" : "default"} size="sm">
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  {isExpanded ? "Hide" : "Browse"}
+                </Button>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {expandedActivity && expandedPlaylists.length > 0 && (
+        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {expandedPlaylists.map((playlist) => (
+            <Card key={`${expandedActivity}-${playlist.name}`} className="transition-shadow hover:shadow-md">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">{playlist.name}</CardTitle>
+                <CardDescription className="text-sm">{playlist.description}</CardDescription>
+              </CardHeader>
+
+              <CardContent className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openSpotify(playlist.spotifyQuery);
+                  }}
+                >
+                  <ExternalLink className="mr-1 h-3 w-3" />
+                  Spotify
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openYoutube(playlist.youtubeQuery);
+                  }}
+                >
+                  <ExternalLink className="mr-1 h-3 w-3" />
+                  YouTube
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+});
+
+const RecentPlaylistsSection = memo(function RecentPlaylistsSection({
+  playlists,
+}: {
+  playlists: GeneratedPlaylist[];
+}) {
+  const handleScrollToTop = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  return (
+    <section>
+      <h2 className="mb-4 text-xl font-semibold">Recent Playlists</h2>
+
+      {playlists.length === 0 ? (
+        <Card className="p-8">
+          <EmptyState
+            icon={ListMusic}
+            title="No playlists yet"
+            description="Generate your first playlist by selecting an activity above!"
+            actionLabel="Scroll to Activities"
+            onAction={handleScrollToTop}
+          />
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {playlists.map((playlist) => (
+            <Card key={playlist.id} className="transition-shadow hover:shadow-md">
+              <CardHeader>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-lg">{playlist.name}</CardTitle>
+                    <CardDescription className="capitalize">
+                      {playlist.activity_types?.name} • {playlist.song_recommendations?.length || 0} songs
+                    </CardDescription>
+                  </div>
+
+                  <Button size="icon" variant="ghost" aria-label={`Play ${playlist.name}`}>
+                    <Play className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+
+              <CardContent>
+                <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">{playlist.description}</p>
+                <div className="flex items-center text-xs text-muted-foreground">
+                  <Clock className="mr-1 h-3 w-3" />
+                  {new Date(playlist.created_at).toLocaleDateString()}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+});
+
+const DashboardAnalytics = memo(function DashboardAnalytics() {
+  return (
+    <>
+      <section className="mb-12">
+        <SectionErrorBoundary fallbackTitle="Charts failed to load">
+          <Suspense fallback={chartFallback}>
+            <BiometricCharts />
+          </Suspense>
+        </SectionErrorBoundary>
+      </section>
+
+      <section className="mb-12">
+        <SectionErrorBoundary fallbackTitle="Session insights failed to load">
+          <SessionInsights />
+        </SectionErrorBoundary>
+      </section>
+
+      <section className="mb-12">
+        <SectionErrorBoundary fallbackTitle="Personalized insights failed to load">
+          <Suspense fallback={chartFallback}>
+            <PersonalizedInsights />
+          </Suspense>
+        </SectionErrorBoundary>
+      </section>
+    </>
+  );
+});
+
 const Dashboard = () => {
-  const [generatingFor, setGeneratingFor] = useState<string | null>(null);
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // Gate all data fetching on auth readiness
   const { user, isReady } = useAuthReady();
   const { data: activityTypes = [] } = useActivityTypes();
   const { data: profile } = useUserProfile(user?.id);
   const { data: playlists = [] } = useRecentPlaylists(user?.id);
 
-  // Redirect to auth if session is ready but no user
   useEffect(() => {
     if (isReady && !user) {
       navigate("/auth", { replace: true });
     }
   }, [isReady, user, navigate]);
 
-  const handleGeneratePlaylist = async (activityName: string) => {
-    setGeneratingFor(activityName);
-    try {
-      const { data, error } = await supabase.functions.invoke("generate-playlist", {
-        body: { 
-          activityType: activityName,
-          moodPreference: "balanced",
-          energyLevel: activityName === "workout" ? "high" : activityName === "sleep" ? "low" : "moderate"
-        },
-      });
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setShowAnalytics(true);
+    }, 150);
 
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(data.error);
+    return () => window.clearTimeout(id);
+  }, []);
 
-      toast.success(`Generated "${data.playlist.playlistName}"!`);
-      queryClient.invalidateQueries({ queryKey: ["recent-playlists"] });
-    } catch (error) {
-      console.error("Error generating playlist:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to generate playlist");
-    } finally {
-      setGeneratingFor(null);
-    }
-  };
+  const displayName = profile?.display_name ?? "";
+  const typedPlaylists = useMemo(
+    () => playlists as GeneratedPlaylist[],
+    [playlists]
+  );
 
-  const handleLogout = async () => {
+  const handleRouteNavigate = useCallback(
+    (path: string) => {
+      navigate(path);
+    },
+    [navigate]
+  );
+
+  const handleToggleActivity = useCallback((activityName: string) => {
+    setExpandedActivity((current) => (current === activityName ? null : activityName));
+  }, []);
+
+  const handleLogout = useCallback(async () => {
     await supabase.auth.signOut();
     toast.success("Signed out successfully");
     navigate("/");
-  };
+  }, [navigate]);
+
+  const handleGeneratePlaylist = useCallback(
+    async (activityName: string) => {
+      try {
+        const { data, error } = await supabase.functions.invoke("generate-playlist", {
+          body: {
+            activityType: activityName,
+            moodPreference: "balanced",
+            energyLevel:
+              activityName === "workout"
+                ? "high"
+                : activityName === "sleep"
+                ? "low"
+                : "moderate",
+          },
+        });
+
+        if (error) throw new Error(error.message);
+        if (data?.error) throw new Error(data.error);
+
+        toast.success(`Generated "${data.playlist.playlistName}"!`);
+        queryClient.invalidateQueries({ queryKey: ["recent-playlists"] });
+      } catch (error) {
+        console.error("Error generating playlist:", error);
+        toast.error(error instanceof Error ? error.message : "Failed to generate playlist");
+      }
+    },
+    [queryClient]
+  );
+
+  void handleGeneratePlaylist;
 
   if (!isReady) {
     return <DashboardSkeleton />;
   }
 
-  const displayName = profile?.display_name;
-
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Music className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-lg">BioMusic</span>
-          </div>
-          <div className="hidden md:flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/insights")}>
-              <BarChart3 className="w-4 h-4 mr-2" />
-              Weekly
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/monthly")}>
-              <Calendar className="w-4 h-4 mr-2" />
-              Monthly
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/history")}>
-              <History className="w-4 h-4 mr-2" />
-              History
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/settings")}>
-              <Settings className="w-4 h-4 mr-2" />
-              Settings
-            </Button>
-            <span className="text-sm text-muted-foreground">{user?.email}</span>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
-          </div>
-        </div>
-      </header>
+      <DashboardHeader
+        email={user?.email}
+        onNavigate={handleRouteNavigate}
+        onLogout={handleLogout}
+      />
 
       <main className="container mx-auto px-4 py-8 pb-32">
-        {/* Welcome Section */}
         <section className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">
+          <h1 className="mb-2 text-3xl font-bold">
             Welcome back{displayName ? `, ${displayName}` : ""}! 👋
           </h1>
           <p className="text-muted-foreground">
@@ -209,220 +488,85 @@ const Dashboard = () => {
           </p>
         </section>
 
-        {/* Quick Stats Row */}
         <section className="mb-8">
           <SectionErrorBoundary fallbackTitle="Quick stats failed to load">
             <QuickStatsRow />
           </SectionErrorBoundary>
         </section>
 
-        {/* Weekly Recap Notification */}
         <section className="mb-8">
           <SectionErrorBoundary fallbackTitle="Weekly recap failed to load">
             <WeeklyRecap />
           </SectionErrorBoundary>
         </section>
 
-        {/* Recent Session Stats & Streak */}
         <section className="mb-8">
           <SectionErrorBoundary fallbackTitle="Session stats failed to load">
             <RecentSessionWidget />
           </SectionErrorBoundary>
         </section>
 
-        {/* Achievement Badges */}
         <section className="mb-8">
           <SectionErrorBoundary fallbackTitle="Achievements failed to load">
             <AchievementBadges />
           </SectionErrorBoundary>
         </section>
 
-        {/* Session Flow - Dedicated Listening Session */}
         <section className="mb-8">
           <SectionErrorBoundary fallbackTitle="Session flow failed to load">
             <SessionFlow />
           </SectionErrorBoundary>
         </section>
 
-        {/* Biometric Monitor & Apple Watch */}
-        <section className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <section className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
           <SectionErrorBoundary fallbackTitle="Biometric monitor failed to load">
             <BiometricMonitor />
           </SectionErrorBoundary>
+
           <SectionErrorBoundary fallbackTitle="Apple Watch connect failed to load">
             <AppleWatchConnect />
           </SectionErrorBoundary>
         </section>
 
-        {/* Smart Recommendations */}
         <section className="mb-8">
           <SectionErrorBoundary fallbackTitle="Recommendations failed to load">
             <RecommendationEngine />
           </SectionErrorBoundary>
         </section>
 
-        {/* Smart Scheduling */}
         <section className="mb-8">
           <SectionErrorBoundary fallbackTitle="Scheduler failed to load">
-            <Suspense fallback={<ChartSkeleton />}>
+            <Suspense fallback={chartFallback}>
               <SmartScheduler />
             </Suspense>
           </SectionErrorBoundary>
         </section>
 
-        {/* Music Player Section */}
         <section className="mb-12">
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <Headphones className="w-5 h-5 text-primary" />
+          <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold">
+            <Headphones className="h-5 w-5 text-primary" />
             Your Music
           </h2>
+
           <SectionErrorBoundary fallbackTitle="Music player failed to load">
             <MusicTabs />
           </SectionErrorBoundary>
         </section>
 
-        {/* Activity Cards */}
-        <section className="mb-12">
-          <h2 className="text-xl font-semibold mb-4">Curated Playlists by Activity</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-            {activityTypes.map((activity) => (
-              <Card 
-                key={activity.id} 
-                className={cn(
-                  "hover:border-primary/50 transition-colors cursor-pointer group",
-                  expandedActivity === activity.name && "border-primary"
-                )}
-                onClick={() => setExpandedActivity(expandedActivity === activity.name ? null : activity.name)}
-              >
-                <CardHeader className="pb-2">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:bg-primary/20 transition-colors">
-                    {activityIcons[activity.name] || <Music className="w-6 h-6" />}
-                  </div>
-                  <CardTitle className="capitalize text-base">{activity.name}</CardTitle>
-                  <CardDescription className="text-xs">
-                    {activity.description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button
-                    className="w-full"
-                    variant={expandedActivity === activity.name ? "secondary" : "default"}
-                    size="sm"
-                  >
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    {expandedActivity === activity.name ? "Hide" : "Browse"}
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+        <ActivityPlaylistBrowser
+          activityTypes={activityTypes as ActivityType[]}
+          expandedActivity={expandedActivity}
+          onToggleActivity={handleToggleActivity}
+        />
 
-          {/* Expanded curated playlists */}
-          {expandedActivity && curatedPlaylists[expandedActivity] && (
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {curatedPlaylists[expandedActivity].map((playlist, idx) => (
-                <Card key={idx} className="hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">{playlist.name}</CardTitle>
-                    <CardDescription className="text-sm">{playlist.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => window.open(`https://open.spotify.com/search/${encodeURIComponent(playlist.spotifyQuery)}`, "_blank")}
-                    >
-                      <ExternalLink className="w-3 h-3 mr-1" />
-                      Spotify
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => window.open(`https://music.youtube.com/search?q=${encodeURIComponent(playlist.youtubeQuery)}`, "_blank")}
-                    >
-                      <ExternalLink className="w-3 h-3 mr-1" />
-                      YouTube
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </section>
+        <RecentPlaylistsSection playlists={typedPlaylists} />
 
-        {/* Recent Playlists */}
-        <section>
-          <h2 className="text-xl font-semibold mb-4">Recent Playlists</h2>
-          {playlists.length === 0 ? (
-            <Card className="p-8">
-              <EmptyState
-                icon={ListMusic}
-                title="No playlists yet"
-                description="Generate your first playlist by selecting an activity above!"
-                actionLabel="Scroll to Activities"
-                onAction={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-              />
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {(playlists as GeneratedPlaylist[]).map((playlist) => (
-                <Card key={playlist.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-lg">{playlist.name}</CardTitle>
-                        <CardDescription className="capitalize">
-                          {playlist.activity_types?.name} • {playlist.song_recommendations?.length || 0} songs
-                        </CardDescription>
-                      </div>
-                      <Button size="icon" variant="ghost">
-                        <Play className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                      {playlist.description}
-                    </p>
-                    <div className="flex items-center text-xs text-muted-foreground">
-                      <Clock className="w-3 h-3 mr-1" />
-                      {new Date(playlist.created_at).toLocaleDateString()}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Biometric Charts & Visualizations */}
-        <section className="mb-12">
-          <SectionErrorBoundary fallbackTitle="Charts failed to load">
-            <Suspense fallback={<ChartSkeleton />}>
-              <BiometricCharts />
-            </Suspense>
-          </SectionErrorBoundary>
-        </section>
-
-        {/* Session Analytics & Insights */}
-        <section className="mb-12">
-          <SectionErrorBoundary fallbackTitle="Session insights failed to load">
-            <SessionInsights />
-          </SectionErrorBoundary>
-        </section>
-
-        {/* Personalized Music Insights */}
-        <section className="mb-12">
-          <SectionErrorBoundary fallbackTitle="Personalized insights failed to load">
-            <Suspense fallback={<ChartSkeleton />}>
-              <PersonalizedInsights />
-            </Suspense>
-          </SectionErrorBoundary>
-        </section>
+        {showAnalytics ? <DashboardAnalytics /> : null}
       </main>
-      <QuickLogButton />
+
+      <Suspense fallback={null}>
+        <QuickLogButton />
+      </Suspense>
     </div>
   );
 };
