@@ -76,24 +76,76 @@ export const SessionFlow = forwardRef<HTMLDivElement>((_, ref) => {
   const [isSaving, setIsSaving] = useState(false);
   const [showSummaryReport, setShowSummaryReport] = useState(false);
 
-  // Session tracking for summary report
-  const [biometricHistory, setBiometricHistory] = useState<Array<{
-    timestamp: Date;
-    heartRate: number;
-    focusScore: number;
-    relaxationScore: number;
-    stressLevel: number;
-  }>>([]);
-  const [musicAdaptations, setMusicAdaptations] = useState<Array<{
-    timestamp: Date;
-    trackName: string;
-    artist: string;
-    tempo: number;
-    energy: number;
-    reason: string;
-    triggerType: 'biometric' | 'goal' | 'manual' | 'auto';
-  }>>([]);
+const [biometricHistory, setBiometricHistory] = useState<Array<{
+  timestamp: Date;
+  heartRate: number;
+  focusScore: number;
+  relaxationScore: number;
+  stressLevel: number;
+}>>([]);
 
+const [musicAdaptations, setMusicAdaptations] = useState<Array<{
+  timestamp: Date;
+  trackName: string;
+  artist: string;
+  tempo: number;
+  energy: number;
+  reason: string;
+  triggerType: 'biometric' | 'goal' | 'manual' | 'auto';
+}>>([]);
+
+  const biometricHistoryRef = useRef<Array<{
+  timestamp: Date;
+  heartRate: number;
+  focusScore: number;
+  relaxationScore: number;
+  stressLevel: number;
+}>>([]);
+
+const musicAdaptationsRef = useRef<Array<{
+  timestamp: Date;
+  trackName: string;
+  artist: string;
+  tempo: number;
+  energy: number;
+  reason: string;
+  triggerType: "biometric" | "goal" | "manual" | "auto";
+}>>([]);
+
+const appendBiometricHistory = useCallback((entry: {
+  timestamp: Date;
+  heartRate: number;
+  focusScore: number;
+  relaxationScore: number;
+  stressLevel: number;
+}) => {
+  biometricHistoryRef.current.push(entry);
+
+  if (biometricHistoryRef.current.length > 1000) {
+    biometricHistoryRef.current = biometricHistoryRef.current.slice(-1000);
+  }
+}, []);
+
+const appendMusicAdaptation = useCallback((entry: {
+  timestamp: Date;
+  trackName: string;
+  artist: string;
+  tempo: number;
+  energy: number;
+  reason: string;
+  triggerType: "biometric" | "goal" | "manual" | "auto";
+}) => {
+  musicAdaptationsRef.current.push(entry);
+
+  if (musicAdaptationsRef.current.length > 500) {
+    musicAdaptationsRef.current = musicAdaptationsRef.current.slice(-500);
+  }
+}, []);
+
+const syncSessionBuffersToState = useCallback(() => {
+  setBiometricHistory([...biometricHistoryRef.current]);
+  setMusicAdaptations([...musicAdaptationsRef.current]);
+}, []);
   const { state: biometricState, startTracking, stopTracking, addReading, saveReadingsToSession } = useBiometricTracking();
   
   // Starting song recommendation based on previous session data
@@ -157,26 +209,50 @@ export const SessionFlow = forwardRef<HTMLDivElement>((_, ref) => {
   // Timer for active session with milestone notifications
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
-    if (step === "active" && startTime) {
-      interval = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - startTime.getTime()) / 1000);
-        setElapsedTime(elapsed);
-        
-        // Check for session time milestones (every 15 minutes)
-        const currentMilestone = Math.floor(elapsed / 900); // 900 seconds = 15 minutes
-        if (currentMilestone > sessionMilestoneRef.current && currentMilestone > 0) {
-          sessionMilestoneRef.current = currentMilestone;
-          const minutes = currentMilestone * 15;
-          const activity = selectedActivityRef.current;
-          flowNotificationsRef.current.notifySessionMilestone(
-            `${minutes} Minutes Complete!`,
-            `Great job staying focused for ${minutes} minutes${activity ? ` on ${activity.name}` : ""}`
-          );
-        }
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [step, startTime]);
+    if {step === "active" && (
+  <ActiveSessionPanel
+    selectedActivityName={selectedActivity?.name}
+    elapsedTime={elapsedTime}
+    flowState={biometricState.flowState}
+    currentReading={{
+      heartRate: biometricState.currentReading?.heartRate,
+      stressLevel: biometricState.currentReading?.stressLevel,
+      focusScore: biometricState.currentReading?.focusScore,
+      relaxationScore: biometricState.currentReading?.relaxationScore,
+    }}
+    readingCount={biometricState.readings.length}
+    jamendo={{
+      currentTrack: jamendo.currentTrack,
+      isPlaying: jamendo.isPlaying,
+      togglePlay: jamendo.togglePlay,
+      play: jamendo.play,
+      loadByMood: jamendo.loadByMood,
+      tracks: jamendo.tracks,
+      audioRef: jamendo.audioRef,
+    }}
+    adaptiveMusicState={{
+      isEnabled: adaptiveMusic.state.isEnabled,
+      currentRecommendation: adaptiveMusic.state.currentRecommendation,
+    }}
+    autoPlayQueue={{
+      state: autoPlayQueue.state,
+      enableAutoPlay: autoPlayQueue.enableAutoPlay,
+      disableAutoPlay: autoPlayQueue.disableAutoPlay,
+      skipToNext: autoPlayQueue.skipToNext,
+      getCurrentTrack: autoPlayQueue.getCurrentTrack,
+      addToQueue: autoPlayQueue.addToQueue,
+    }}
+    adaptationEvents={adaptationEvents}
+    trackFeedback={{
+      getFeedback: trackFeedback.getFeedback,
+      submitFeedback: trackFeedback.submitFeedback,
+    }}
+    onEndSession={handleEndSession}
+    onResetRecommendationDedup={() => {
+      lastRecommendationRef.current = null;
+    }}
+  />
+)}
 
   // Auto-play: Handle track ending and queue next song
   useEffect(() => {
