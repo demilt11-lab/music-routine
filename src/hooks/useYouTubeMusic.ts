@@ -20,80 +20,112 @@ interface UseYouTubeMusicReturn {
   parseYouTubeUrl: (url: string) => string | null;
 }
 
+const YOUTUBE_PATTERNS = [
+  /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+  /youtube\.com\/shorts\/([^&\n?#]+)/,
+  /music\.youtube\.com\/watch\?v=([^&\n?#]+)/,
+];
+
+function createTrack(videoId: string, title: string, artist: string): YouTubeTrack {
+  return {
+    id: crypto.randomUUID(),
+    videoId,
+    title,
+    artist,
+    thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
+    embedUrl: `https://www.youtube.com/embed/${videoId}?enablejsapi=1`,
+  };
+}
+
 export function useYouTubeMusic(): UseYouTubeMusicReturn {
   const [tracks, setTracks] = useState<YouTubeTrack[]>([]);
   const [currentTrack, setCurrentTrack] = useState<YouTubeTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
   const parseYouTubeUrl = useCallback((url: string): string | null => {
-    const patterns = [
-      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-      /youtube\.com\/shorts\/([^&\n?#]+)/,
-      /music\.youtube\.com\/watch\?v=([^&\n?#]+)/,
-    ];
+    const normalizedUrl = url.trim();
+    if (!normalizedUrl) return null;
 
-    for (const pattern of patterns) {
-      const match = url.match(pattern);
-      if (match) return match[1];
+    for (const pattern of YOUTUBE_PATTERNS) {
+      const match = normalizedUrl.match(pattern);
+      if (match?.[1]) return match[1];
     }
+
     return null;
   }, []);
 
-  const addTrack = useCallback(async (url: string): Promise<boolean> => {
-    const videoId = parseYouTubeUrl(url);
-    if (!videoId) return false;
+  const addTrack = useCallback(
+    async (url: string): Promise<boolean> => {
+      const videoId = parseYouTubeUrl(url);
+      if (!videoId) return false;
 
-    // Check if already added
-    if (tracks.some((t) => t.videoId === videoId)) {
-      return false;
-    }
+      try {
+        const response = await fetch(
+          `https://noembed.com/embed?url=${encodeURIComponent(
+            `https://www.youtube.com/watch?v=${videoId}`
+          )}`
+        );
 
-    // Use noembed.com for metadata (no API key required)
-    try {
-      const response = await fetch(
-        `https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`
-      );
-      const data = await response.json();
+        if (!response.ok) {
+          throw new Error(`Metadata request failed with status ${response.status}`);
+        }
 
-      const newTrack: YouTubeTrack = {
-        id: crypto.randomUUID(),
-        videoId,
-        title: data.title || "Unknown Title",
-        artist: data.author_name || "Unknown Artist",
-        thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
-        embedUrl: `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`,
-      };
+        const data = await response.json();
 
-      setTracks((prev) => [...prev, newTrack]);
-      return true;
-    } catch (error) {
-      console.error("Error fetching YouTube metadata:", error);
-      
-      // Add with basic info if metadata fetch fails
-      const newTrack: YouTubeTrack = {
-        id: crypto.randomUUID(),
-        videoId,
-        title: "YouTube Video",
-        artist: "Unknown",
-        thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
-        embedUrl: `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`,
-      };
+        let wasAdded = false;
 
-      setTracks((prev) => [...prev, newTrack]);
-      return true;
-    }
-  }, [tracks, parseYouTubeUrl]);
+        setTracks((prev) => {
+          if (prev.some((track) => track.videoId === videoId)) {
+            return prev;
+          }
+
+          wasAdded = true;
+          return [
+            ...prev,
+            createTrack(
+              videoId,
+              data.title || "Unknown Title",
+              data.author_name || "Unknown Artist"
+            ),
+          ];
+        });
+
+        return wasAdded;
+      } catch (error) {
+        console.error("Error fetching YouTube metadata:", error);
+
+        let wasAdded = false;
+
+        setTracks((prev) => {
+          if (prev.some((track) => track.videoId === videoId)) {
+            return prev;
+          }
+
+          wasAdded = true;
+          return [...prev, createTrack(videoId, "YouTube Video", "Unknown")];
+        });
+
+        return wasAdded;
+      }
+    },
+    [parseYouTubeUrl]
+  );
 
   const removeTrack = useCallback((id: string) => {
-    setTracks((prev) => prev.filter((t) => t.id !== id));
-    if (currentTrack?.id === id) {
-      setCurrentTrack(null);
+    setTracks((prev) => prev.filter((track) => track.id !== id));
+
+    setCurrentTrack((prev) => {
+      if (prev?.id !== id) return prev;
       setIsPlaying(false);
-    }
-  }, [currentTrack]);
+      return null;
+    });
+  }, []);
 
   const playTrack = useCallback((track: YouTubeTrack) => {
-    setCurrentTrack(track);
+    setCurrentTrack((prev) => {
+      if (prev?.id === track.id) return prev;
+      return track;
+    });
     setIsPlaying(true);
   }, []);
 
