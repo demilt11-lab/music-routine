@@ -37,13 +37,61 @@ interface UseJamendoReturn {
   search: (params: JamendoSearchParams) => Promise<void>;
   loadFeatured: () => Promise<void>;
   loadByMood: (mood: string) => Promise<void>;
-  searchByTempoEnergy: (targetTempo: number, targetEnergy: number, activityType?: string) => Promise<JamendoTrack[]>;
-  play: (track: JamendoTrack) => void;
+  searchByTempoEnergy: (
+    targetTempo: number,
+    targetEnergy: number,
+    activityType?: string
+  ) => Promise<JamendoTrack[]>;
+  play: (track: JamendoTrack) => Promise<void>;
   pause: () => void;
-  togglePlay: () => void;
+  togglePlay: () => Promise<void>;
   seek: (time: number) => void;
   setOnTrackEnd: (callback: (() => void) | null) => void;
   audioRef: React.RefObject<HTMLAudioElement>;
+}
+
+const moodTagMap: Record<string, string> = {
+  sleep: "relaxing+ambient+calm",
+  workout: "energetic+electronic+upbeat",
+  study: "ambient+instrumental+focus",
+  relax: "chillout+lounge+peaceful",
+  commute: "pop+upbeat+happy",
+  meditation: "ambient+spiritual+peaceful",
+  party: "dance+electronic+energetic",
+};
+
+const activityTags: Record<string, string> = {
+  sleep: "ambient+relaxing",
+  workout: "energetic+electronic",
+  study: "focus+instrumental",
+  relax: "chillout+peaceful",
+  commute: "pop+upbeat",
+};
+
+function buildJamendoUrl(
+  endpoint: string,
+  params: Record<string, string | number | undefined>
+) {
+  const url = new URL(`${SUPABASE_URL}/functions/v1/jamendo-proxy`);
+  url.searchParams.set("endpoint", endpoint);
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") {
+      url.searchParams.set(key, String(value));
+    }
+  }
+
+  return url.toString();
+}
+
+async function fetchJamendo<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Jamendo request failed with status ${response.status}`);
+  }
+
+  return response.json();
 }
 
 export function useJamendo(): UseJamendoReturn {
@@ -55,30 +103,21 @@ export function useJamendo(): UseJamendoReturn {
   const [duration, setDuration] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   const audioRef = useRef<HTMLAudioElement>(null);
   const onTrackEndRef = useRef<(() => void) | null>(null);
-
-  // Use edge function proxy to avoid CORS issues with Jamendo API
-  const buildUrl = (endpoint: string, params: Record<string, string | number | undefined>) => {
-    const url = new URL(`${SUPABASE_URL}/functions/v1/jamendo-proxy`);
-    url.searchParams.set("endpoint", endpoint);
-    
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined) {
-        url.searchParams.set(key, String(value));
-      }
-    });
-    
-    return url.toString();
-  };
+  const mountedRef = useRef(true);
+  const activeRequestIdRef = useRef(0);
+  const lastWholeSecondRef = useRef(-1);
 
   const search = useCallback(async (params: JamendoSearchParams) => {
+    const requestId = ++activeRequestIdRef.current;
     setIsLoading(true);
     setError(null);
 
     try {
-      const url = buildUrl("tracks", {
-        search: params.search,
+      const url = buildJamendoUrl("tracks", {
+        search: params.search?.trim(),
         tags: params.tags,
         speed: params.speed,
         acousticelectric: params.acousticelectric,
@@ -88,127 +127,142 @@ export function useJamendo(): UseJamendoReturn {
         boost: "popularity_total",
       });
 
-      const response = await fetch(url);
-      const data = await response.json();
+      const data = await fetchJamendo<{ results?: JamendoTrack[]; error?: { message?: string } }>(url);
+
+      if (!mountedRef.current || requestId !== activeRequestIdRef.current) return;
 
       if (data.results) {
         setTracks(data.results);
       } else {
         setTracks([]);
-        if (data.error) {
-          setError(data.error.message);
-        }
+        setError(data.error?.message || "No tracks found");
       }
     } catch (err) {
       console.error("Jamendo search error:", err);
+
+      if (!mountedRef.current || requestId !== activeRequestIdRef.current) return;
+
+      setTracks([]);
       setError("Failed to search tracks");
       toast.error("Failed to search Jamendo");
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current && requestId === activeRequestIdRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
   const loadFeatured = useCallback(async () => {
+    const requestId = ++activeRequestIdRef.current;
     setIsLoading(true);
     setError(null);
 
     try {
-      const url = buildUrl("tracks", {
+      const url = buildJamendoUrl("tracks", {
         limit: 12,
         order: "popularity_total",
         include: "musicinfo",
         boost: "popularity_month",
       });
 
-      const response = await fetch(url);
-      const data = await response.json();
+      const data = await fetchJamendo<{ results?: JamendoTrack[] }>(url);
 
-      if (data.results) {
-        setFeaturedTracks(data.results);
-      }
+      if (!mountedRef.current || requestId !== activeRequestIdRef.current) return;
+
+      setFeaturedTracks(data.results || []);
     } catch (err) {
       console.error("Jamendo featured error:", err);
+
+      if (!mountedRef.current || requestId !== activeRequestIdRef.current) return;
+
+      setFeaturedTracks([]);
       setError("Failed to load featured tracks");
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current && requestId === activeRequestIdRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
-  const loadByMood = useCallback(async (mood: string) => {
-    // Map activity types to Jamendo tags
-    const moodTagMap: Record<string, string> = {
-      sleep: "relaxing+ambient+calm",
-      workout: "energetic+electronic+upbeat",
-      study: "ambient+instrumental+focus",
-      relax: "chillout+lounge+peaceful",
-      commute: "pop+upbeat+happy",
-      meditation: "ambient+spiritual+peaceful",
-      party: "dance+electronic+energetic",
-    };
+  const loadByMood = useCallback(
+    async (mood: string) => {
+      const normalizedMood = mood.toLowerCase();
+      const tags = moodTagMap[normalizedMood] || mood;
 
-    const tags = moodTagMap[mood.toLowerCase()] || mood;
-
-    await search({
-      tags,
-      limit: 20,
-      vocalinstrumental: mood === "study" || mood === "meditation" ? "instrumental" : undefined,
-    });
-  }, [search]);
-
-  // Search for tracks matching tempo and energy targets from AI recommendations
-  const searchByTempoEnergy = useCallback(async (
-    targetTempo: number, 
-    targetEnergy: number, 
-    activityType?: string
-  ): Promise<JamendoTrack[]> => {
-    try {
-      // Map tempo to Jamendo speed parameter
-      let speed: "low" | "medium" | "high" | "veryhigh" | undefined;
-      if (targetTempo < 80) speed = "low";
-      else if (targetTempo < 110) speed = "medium";
-      else if (targetTempo < 140) speed = "high";
-      else speed = "veryhigh";
-
-      // Map energy to acoustic/electric preference
-      const acousticelectric = targetEnergy < 0.4 ? "acoustic" : "electric";
-
-      // Get tags based on activity type
-      const activityTags: Record<string, string> = {
-        sleep: "ambient+relaxing",
-        workout: "energetic+electronic",
-        study: "focus+instrumental",
-        relax: "chillout+peaceful",
-        commute: "pop+upbeat",
-      };
-      const tags = activityType ? activityTags[activityType.toLowerCase()] : undefined;
-
-      const url = buildUrl("tracks", {
+      await search({
         tags,
-        speed,
-        acousticelectric,
-        vocalinstrumental: targetEnergy < 0.5 ? "instrumental" : undefined,
-        limit: 10,
-        include: "musicinfo",
-        boost: "popularity_total",
+        limit: 20,
+        vocalinstrumental:
+          normalizedMood === "study" || normalizedMood === "meditation"
+            ? "instrumental"
+            : undefined,
       });
+    },
+    [search]
+  );
 
-      const response = await fetch(url);
-      const data = await response.json();
+  const searchByTempoEnergy = useCallback(
+    async (
+      targetTempo: number,
+      targetEnergy: number,
+      activityType?: string
+    ): Promise<JamendoTrack[]> => {
+      try {
+        let speed: "low" | "medium" | "high" | "veryhigh" | undefined;
 
-      return data.results || [];
-    } catch (err) {
-      console.error("Jamendo tempo/energy search error:", err);
-      return [];
-    }
-  }, []);
+        if (targetTempo < 80) speed = "low";
+        else if (targetTempo < 110) speed = "medium";
+        else if (targetTempo < 140) speed = "high";
+        else speed = "veryhigh";
 
-  const play = useCallback((track: JamendoTrack) => {
+        const acousticelectric = targetEnergy < 0.4 ? "acoustic" : "electric";
+        const tags = activityType ? activityTags[activityType.toLowerCase()] : undefined;
+
+        const url = buildJamendoUrl("tracks", {
+          tags,
+          speed,
+          acousticelectric,
+          vocalinstrumental: targetEnergy < 0.5 ? "instrumental" : undefined,
+          limit: 10,
+          include: "musicinfo",
+          boost: "popularity_total",
+        });
+
+        const data = await fetchJamendo<{ results?: JamendoTrack[] }>(url);
+        return data.results || [];
+      } catch (err) {
+        console.error("Jamendo tempo/energy search error:", err);
+        return [];
+      }
+    },
+    []
+  );
+
+  const play = useCallback(async (track: JamendoTrack) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
     setCurrentTrack(track);
-    if (audioRef.current) {
-      audioRef.current.src = track.audio;
-      audioRef.current.play();
+
+    if (audio.src !== track.audio) {
+      audio.src = track.audio;
+      audio.preload = "none";
+      setCurrentTime(0);
+      lastWholeSecondRef.current = -1;
     }
-    setIsPlaying(true);
+
+    try {
+      await audio.play();
+      if (mountedRef.current) {
+        setIsPlaying(true);
+      }
+    } catch (err) {
+      console.error("Jamendo play error:", err);
+      if (mountedRef.current) {
+        setIsPlaying(false);
+      }
+      toast.error("Unable to play track");
+    }
   }, []);
 
   const pause = useCallback(() => {
@@ -216,19 +270,36 @@ export function useJamendo(): UseJamendoReturn {
     setIsPlaying(false);
   }, []);
 
-  const togglePlay = useCallback(() => {
+  const togglePlay = useCallback(async () => {
+    const audio = audioRef.current;
+    if (!audio || !currentTrack) return;
+
     if (isPlaying) {
       pause();
-    } else if (currentTrack) {
-      audioRef.current?.play();
-      setIsPlaying(true);
+      return;
     }
-  }, [isPlaying, pause, currentTrack]);
+
+    try {
+      await audio.play();
+      if (mountedRef.current) {
+        setIsPlaying(true);
+      }
+    } catch (err) {
+      console.error("Jamendo resume error:", err);
+      toast.error("Unable to resume playback");
+    }
+  }, [currentTrack, isPlaying, pause]);
 
   const seek = useCallback((time: number) => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = time;
-      setCurrentTime(time);
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    audio.currentTime = time;
+    const rounded = Math.floor(time);
+
+    if (lastWholeSecondRef.current !== rounded) {
+      lastWholeSecondRef.current = rounded;
+      setCurrentTime(rounded);
     }
   }, []);
 
@@ -236,24 +307,48 @@ export function useJamendo(): UseJamendoReturn {
     onTrackEndRef.current = callback;
   }, []);
 
-  // Audio event listeners
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const handleDurationChange = () => setDuration(audio.duration);
+    const handleTimeUpdate = () => {
+      const rounded = Math.floor(audio.currentTime);
+      if (lastWholeSecondRef.current !== rounded) {
+        lastWholeSecondRef.current = rounded;
+        setCurrentTime(rounded);
+      }
+    };
+
+    const handleLoadedMetadata = () => {
+      setDuration(Math.floor(audio.duration || 0));
+    };
+
+    const handleDurationChange = () => {
+      setDuration(Math.floor(audio.duration || 0));
+    };
+
     const handleEnded = () => {
       setIsPlaying(false);
-      // Call the onTrackEnd callback for auto-play
+      setCurrentTime(0);
+      lastWholeSecondRef.current = -1;
+
       if (onTrackEndRef.current) {
         onTrackEndRef.current();
       }
     };
+
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
 
     audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
     audio.addEventListener("durationchange", handleDurationChange);
     audio.addEventListener("ended", handleEnded);
     audio.addEventListener("play", handlePlay);
@@ -261,6 +356,7 @@ export function useJamendo(): UseJamendoReturn {
 
     return () => {
       audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
       audio.removeEventListener("durationchange", handleDurationChange);
       audio.removeEventListener("ended", handleEnded);
       audio.removeEventListener("play", handlePlay);
