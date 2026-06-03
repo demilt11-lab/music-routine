@@ -33,6 +33,12 @@ const queryClient = new QueryClient({
       retry: 1,
       refetchOnWindowFocus: false,
     },
+    mutations: {
+      // Log mutation errors for debugging (but avoid noisy UI toasts)
+      onError: (error) => {
+        console.error("Mutation error:", error);
+      },
+    },
   },
 });
 
@@ -63,7 +69,6 @@ const App = () => {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
     if (!isNonProductionHost()) return;
-
     const cleanup = async () => {
       const registrations = await navigator.serviceWorker.getRegistrations();
       await Promise.all(registrations.map((r) => r.unregister()));
@@ -72,44 +77,41 @@ const App = () => {
         await Promise.all(keys.map((k) => caches.delete(k)));
       }
     };
-
     cleanup().catch((err) => console.warn("SW cleanup failed:", err));
   }, []);
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-      <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <TooltipProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <ConnectionStatusBanner />
-            <ScrollToTop />
-            <div className="min-h-screen pb-16 md:pb-0">
-              <ErrorBoundary>
-                <Suspense fallback={<PageLoader />}>
-                  <Routes>
-                    <Route path="/" element={<Index />} />
-                    <Route path="/auth" element={<Auth />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/history" element={<SessionHistory />} />
-                    <Route path="/insights" element={<WeeklyInsights />} />
-                    <Route path="/monthly" element={<MonthlyProgress />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="/feedback" element={<TrackFeedback />} />
-                    <Route path="/app" element={<AppListing />} />
-                    <Route path="/install" element={<Install />} />
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </Suspense>
-              </ErrorBoundary>
-              <MobileNavBar />
+            <ErrorBoundary>
+              <ConnectionStatusBanner />
               <IOSInstallPrompt />
-            </div>
+              <MobileNavBar />
+              <ScrollToTop />
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/history" element={<SessionHistory />} />
+                  <Route path="/insights" element={<WeeklyInsights />} />
+                  <Route path="/progress" element={<MonthlyProgress />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/track-feedback" element={<TrackFeedback />} />
+                  <Route path="/apps" element={<AppListing />} />
+                  <Route path="/install" element={<Install />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
+            </ErrorBoundary>
           </BrowserRouter>
         </TooltipProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 };
 
