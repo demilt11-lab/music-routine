@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment variables - NEVER commit real .env files
+.env
+.env.local
+.env.production
+.env.*.local
+# Allow the example template
+!.env.example
