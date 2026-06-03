@@ -89,7 +89,7 @@ interface SessionWithBiometrics extends Session {
 
 type TimeRange = "7d" | "30d" | "90d";
 
-const ACTIVITY_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+const ACTIVITY_ICON_MAP: Record<string, React.ElementType> = {
   sleep: Moon,
   workout: Dumbbell,
   study: BookOpen,
@@ -98,7 +98,7 @@ const ACTIVITY_ICON_MAP: Record<string, React.ComponentType<{ className?: string
   meditation: Brain,
 };
 
-const MOOD_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+const MOOD_ICON_MAP: Record<string, React.ElementType> = {
   great: Smile,
   good: Smile,
   neutral: Meh,
@@ -153,22 +153,13 @@ const SessionRow = memo(function SessionRow({
 
   const eegAverages = useMemo(() => {
     const bands = ["delta", "theta", "alpha", "beta", "gamma"] as const;
-
     return bands.map((band) => {
       const key = `eeg_${band}` as keyof BiometricReading;
       const values = session.biometrics
         .map((reading) => reading[key] as number | null)
         .filter((value): value is number => value !== null);
-
-      const avg =
-        values.length > 0
-          ? values.reduce((sum, value) => sum + value, 0) / values.length
-          : 0;
-
-      return {
-        band,
-        avg: avg.toFixed(1),
-      };
+      const avg = values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+      return { band, avg: avg.toFixed(1) };
     });
   }, [session.biometrics]);
 
@@ -190,119 +181,95 @@ const SessionRow = memo(function SessionRow({
   }, [onToggle, session.id]);
 
   return (
-    <div className="overflow-hidden rounded-lg border transition-all">
-      <button
-        className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-muted/50"
-        onClick={handleToggle}
-      >
-        <div className="flex items-center gap-4">
-          <div className="rounded-full bg-primary/10 p-2">
-            <ActivityIcon className="h-5 w-5" />
+    <Card key={session.id} className="mb-4 hover:shadow-md transition-shadow cursor-pointer" onClick={handleToggle}>
+      <CardContent className="pt-6">
+        <div className="flex items-start justify-between">
+          <div className="flex items-start space-x-4 flex-1">
+            <ActivityIcon className="w-8 h-8 text-primary flex-shrink-0 mt-1" />
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-lg mb-1">
+                {session.name || `${session.activity_types?.name || "Unknown"} Session`}
+              </h3>
+              <p className="text-sm text-muted-foreground">{formattedStart}</p>
+              <div className="flex items-center gap-2 mt-2">
+                <MoodBeforeIcon className={MOOD_ICON_CLASS_MAP[session.mood_before || "neutral"]} />
+                <span className="text-xs text-muted-foreground">→</span>
+                <MoodAfterIcon className={MOOD_ICON_CLASS_MAP[session.mood_after || "neutral"]} />
+              </div>
+            </div>
           </div>
-
-          <div>
-            <p className="font-medium">
-              {session.name || `${session.activity_types?.name || "Unknown"} Session`}
-            </p>
-            <p className="text-sm text-muted-foreground">{formattedStart}</p>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Badge variant={session.flowScore > 60 ? "default" : "secondary"}>
+              <Sparkles className="w-3 h-3 mr-1" /> {session.flowScore}% Flow
+            </Badge>
+            <Badge variant="outline">
+              <Clock className="w-3 h-3 mr-1" /> {session.duration}m
+            </Badge>
+            {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
           </div>
         </div>
-
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <MoodBeforeIcon className={MOOD_ICON_CLASS_MAP[session.mood_before || "neutral"]} />
-            <span className="text-muted-foreground">→</span>
-            <MoodAfterIcon className={MOOD_ICON_CLASS_MAP[session.mood_after || "neutral"]} />
+        {isExpanded && (
+          <div className="mt-4 pt-4 border-t space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Heart className="w-4 h-4" /> Heart Rate
+                </p>
+                <p className="text-2xl font-semibold mt-1">{session.avgHeartRate || "—"} <span className="text-sm font-normal text-muted-foreground">BPM</span></p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Brain className="w-4 h-4" /> Focus
+                </p>
+                <p className="text-2xl font-semibold mt-1">{session.avgFocus || "—"}<span className="text-sm font-normal text-muted-foreground">%</span></p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Activity className="w-4 h-4" /> Relaxation
+                </p>
+                <p className="text-2xl font-semibold mt-1">{session.avgRelaxation || "—"}<span className="text-sm font-normal text-muted-foreground">%</span></p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <TrendingUp className="w-4 h-4" /> Stress
+                </p>
+                <p className="text-2xl font-semibold mt-1">{session.avgStress || "—"}<span className="text-sm font-normal text-muted-foreground">%</span></p>
+              </div>
+            </div>
+            {hasEEGData && (
+              <div>
+                <h4 className="text-sm font-medium mb-2">EEG Brainwave Data</h4>
+                <div className="grid grid-cols-5 gap-2">
+                  {eegAverages.map(({ band, avg }) => (
+                    <div key={band} className="text-center">
+                      <p className="text-xs text-muted-foreground capitalize">{band}</p>
+                      <p className="text-sm font-semibold">{avg}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {session.notes && (
+              <div>
+                <h4 className="text-sm font-medium mb-1">Session Notes</h4>
+                <p className="text-sm text-muted-foreground">{session.notes}</p>
+              </div>
+            )}
           </div>
-
-          <Badge variant={session.flowScore > 60 ? "default" : "secondary"}>
-            {session.flowScore}% Flow
-          </Badge>
-
-          <Badge variant="outline">{session.duration}m</Badge>
-
-          {isExpanded ? (
-            <ChevronUp className="h-5 w-5 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="h-5 w-5 text-muted-foreground" />
-          )}
-        </div>
-      </button>
-
-      {isExpanded && (
-        <div className="space-y-4 border-t bg-muted/30 p-4">
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <div className="rounded-lg bg-card p-3">
-              <div className="mb-1 flex items-center gap-2">
-                <Heart className="h-4 w-4 text-red-500" />
-                <span className="text-sm text-muted-foreground">Heart Rate</span>
-              </div>
-              <p className="text-xl font-bold">{session.avgHeartRate || "—"} BPM</p>
-            </div>
-
-            <div className="rounded-lg bg-card p-3">
-              <div className="mb-1 flex items-center gap-2">
-                <Activity className="h-4 w-4 text-yellow-500" />
-                <span className="text-sm text-muted-foreground">Focus</span>
-              </div>
-              <p className="text-xl font-bold">{session.avgFocus || "—"}%</p>
-            </div>
-
-            <div className="rounded-lg bg-card p-3">
-              <div className="mb-1 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-green-500" />
-                <span className="text-sm text-muted-foreground">Relaxation</span>
-              </div>
-              <p className="text-xl font-bold">{session.avgRelaxation || "—"}%</p>
-            </div>
-
-            <div className="rounded-lg bg-card p-3">
-              <div className="mb-1 flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-orange-500" />
-                <span className="text-sm text-muted-foreground">Stress</span>
-              </div>
-              <p className="text-xl font-bold">{session.avgStress || "—"}%</p>
-            </div>
-          </div>
-
-          {hasEEGData && (
-            <div className="rounded-lg bg-card p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <Brain className="h-5 w-5 text-purple-500" />
-                <span className="font-medium">EEG Brainwave Data</span>
-              </div>
-
-              <div className="grid grid-cols-5 gap-2">
-                {eegAverages.map(({ band, avg }) => (
-                  <div key={band} className="rounded bg-muted/50 p-2 text-center">
-                    <p className="text-sm font-medium capitalize">{band}</p>
-                    <p className="text-lg">{avg}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {session.notes && (
-            <div className="rounded-lg bg-card p-4">
-              <p className="mb-2 text-sm text-muted-foreground">Session Notes</p>
-              <p>{session.notes}</p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+        )}
+      </CardContent>
+    </Card>
   );
 });
 
 export default function SessionHistory() {
   const navigate = useNavigate();
   const { user, isReady } = useAuthReady();
-
   const [sessions, setSessions] = useState<SessionWithBiometrics[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>("30d");
-  const [activityFilter, setActivityFilter] = useState<string>("all");
+  const [activityFilter, setActivityFilter] = useState("all");
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
 
   useEffect(() => {
@@ -313,103 +280,98 @@ export default function SessionHistory() {
 
   useEffect(() => {
     if (!isReady || !user) return;
-
     let isMounted = true;
 
     const fetchSessionHistory = async () => {
       setIsLoading(true);
-
+      setError(null);
       const startDate = subDays(new Date(), getDaysFromRange(timeRange));
 
-      const { data: sessionsData, error: sessionsError } = await supabase
-        .from("listening_sessions")
-        .select(`
-          *,
-          activity_types(id, name),
-          session_songs(id)
-        `)
-        .eq("user_id", user.id)
-        .gte("started_at", startDate.toISOString())
-        .order("started_at", { ascending: false });
+      try {
+        const [sessionsResult, biometricsResult] = await Promise.all([
+          supabase
+            .from("listening_sessions")
+            .select(`
+              *,
+              activity_types(id, name),
+              session_songs(id)
+            `)
+            .eq("user_id", user.id)
+            .gte("started_at", startDate.toISOString())
+            .order("started_at", { ascending: false }),
+          supabase
+            .from("biometric_readings")
+            .select("*")
+            .eq("user_id", user.id)
+            .gte("recorded_at", startDate.toISOString()),
+        ]);
 
-      if (sessionsError) {
-        console.error("Error fetching sessions:", sessionsError);
-        if (isMounted) setIsLoading(false);
-        return;
-      }
+        const { data: sessionsData, error: sessionsError } = sessionsResult;
+        const { data: biometricsData, error: biometricsError } = biometricsResult;
 
-      const { data: biometricsData, error: biometricsError } = await supabase
-        .from("biometric_readings")
-        .select("*")
-        .eq("user_id", user.id)
-        .gte("recorded_at", startDate.toISOString());
+        if (sessionsError) throw new Error(`Failed to fetch sessions: ${sessionsError.message}`);
+        if (biometricsError) throw new Error(`Failed to fetch biometrics: ${biometricsError.message}`);
 
-      if (biometricsError) {
-        console.error("Error fetching biometrics:", biometricsError);
-      }
+        const biometricsBySession = new Map<string, BiometricReading[]>();
+        for (const reading of biometricsData || []) {
+          if (!reading.session_id) continue;
+          const bucket = biometricsBySession.get(reading.session_id) ?? [];
+          bucket.push(reading);
+          biometricsBySession.set(reading.session_id, bucket);
+        }
 
-      const biometricsBySession = new Map<string, BiometricReading[]>();
+        const mergedSessions: SessionWithBiometrics[] = (sessionsData || []).map((session) => {
+          const sessionBiometrics = biometricsBySession.get(session.id) ?? [];
+          const heartRates = sessionBiometrics
+            .map((b) => b.heart_rate)
+            .filter((value): value is number => value !== null);
+          const focusScores = sessionBiometrics
+            .map((b) => b.focus_score)
+            .filter((value): value is number => value !== null);
+          const relaxationScores = sessionBiometrics
+            .map((b) => b.relaxation_score)
+            .filter((value): value is number => value !== null);
+          const stressLevels = sessionBiometrics
+            .map((b) => b.stress_level)
+            .filter((value): value is number => value !== null);
 
-      for (const reading of biometricsData || []) {
-        if (!reading.session_id) continue;
-        const bucket = biometricsBySession.get(reading.session_id) ?? [];
-        bucket.push(reading);
-        biometricsBySession.set(reading.session_id, bucket);
-      }
+          const avgHeartRate = averageNumber(heartRates);
+          const avgFocus = averageNumber(focusScores);
+          const avgRelaxation = averageNumber(relaxationScores);
+          const avgStress = averageNumber(stressLevels);
+          const flowScore = Math.round(Math.max(0, Math.min(100, avgFocus * 0.5 + avgRelaxation * 0.3 - avgStress * 0.2)));
 
-      const mergedSessions: SessionWithBiometrics[] = (sessionsData || []).map((session) => {
-        const sessionBiometrics = biometricsBySession.get(session.id) ?? [];
+          const startTime = new Date(session.started_at).getTime();
+          const endTime = session.ended_at ? new Date(session.ended_at).getTime() : startTime;
+          const duration = Math.max(0, Math.floor((endTime - startTime) / 1000 / 60));
 
-        const heartRates = sessionBiometrics
-          .map((b) => b.heart_rate)
-          .filter((value): value is number => value !== null);
+          return {
+            ...session,
+            biometrics: sessionBiometrics,
+            avgHeartRate,
+            avgFocus,
+            avgRelaxation,
+            avgStress,
+            flowScore,
+            duration,
+            songCount: session.session_songs?.length || 0,
+          };
+        });
 
-        const focusScores = sessionBiometrics
-          .map((b) => b.focus_score)
-          .filter((value): value is number => value !== null);
-
-        const relaxationScores = sessionBiometrics
-          .map((b) => b.relaxation_score)
-          .filter((value): value is number => value !== null);
-
-        const stressLevels = sessionBiometrics
-          .map((b) => b.stress_level)
-          .filter((value): value is number => value !== null);
-
-        const avgHeartRate = averageNumber(heartRates);
-        const avgFocus = averageNumber(focusScores);
-        const avgRelaxation = averageNumber(relaxationScores);
-        const avgStress = averageNumber(stressLevels);
-
-        const flowScore = Math.round(
-          Math.max(0, Math.min(100, avgFocus * 0.5 + avgRelaxation * 0.3 - avgStress * 0.2))
-        );
-
-        const startTime = new Date(session.started_at).getTime();
-        const endTime = session.ended_at ? new Date(session.ended_at).getTime() : startTime;
-        const duration = Math.max(0, Math.floor((endTime - startTime) / 1000 / 60));
-
-        return {
-          ...session,
-          biometrics: sessionBiometrics,
-          avgHeartRate,
-          avgFocus,
-          avgRelaxation,
-          avgStress,
-          flowScore,
-          duration,
-          songCount: session.session_songs?.length || 0,
-        };
-      });
-
-      if (isMounted) {
-        setSessions(mergedSessions);
-        setIsLoading(false);
+        if (isMounted) {
+          setSessions(mergedSessions);
+          setIsLoading(false);
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to load session history";
+        if (isMounted) {
+          setError(errorMessage);
+          setIsLoading(false);
+        }
       }
     };
 
     fetchSessionHistory();
-
     return () => {
       isMounted = false;
     };
@@ -418,8 +380,7 @@ export default function SessionHistory() {
   const filteredSessions = useMemo(() => {
     if (activityFilter === "all") return sessions;
     return sessions.filter(
-      (session) =>
-        session.activity_types?.name.toLowerCase() === activityFilter.toLowerCase()
+      (session) => session.activity_types?.name.toLowerCase() === activityFilter.toLowerCase()
     );
   }, [sessions, activityFilter]);
 
@@ -443,11 +404,7 @@ export default function SessionHistory() {
       acc[activity] = (acc[activity] || 0) + 1;
       return acc;
     }, {});
-
-    return Object.entries(distribution).map(([name, count]) => ({
-      name,
-      sessions: count,
-    }));
+    return Object.entries(distribution).map(([name, count]) => ({ name, sessions: count }));
   }, [sessions]);
 
   const moodImprovement = useMemo(() => {
@@ -456,11 +413,9 @@ export default function SessionHistory() {
         const beforeIndex = moodOrder.indexOf(session.mood_before || "neutral");
         const afterIndex = moodOrder.indexOf(session.mood_after || "neutral");
         const improvement = afterIndex - beforeIndex;
-
         if (improvement > 0) acc.improved += 1;
         else if (improvement < 0) acc.declined += 1;
         else acc.same += 1;
-
         return acc;
       },
       { improved: 0, same: 0, declined: 0 }
@@ -469,25 +424,13 @@ export default function SessionHistory() {
 
   const averageStats = useMemo(() => {
     if (sessions.length === 0) {
-      return {
-        avgFlowScore: 0,
-        avgDuration: 0,
-        totalSessions: 0,
-        avgHeartRate: 0,
-      };
+      return { avgFlowScore: 0, avgDuration: 0, totalSessions: 0, avgHeartRate: 0 };
     }
-
     return {
-      avgFlowScore: Math.round(
-        sessions.reduce((sum, session) => sum + session.flowScore, 0) / sessions.length
-      ),
-      avgDuration: Math.round(
-        sessions.reduce((sum, session) => sum + session.duration, 0) / sessions.length
-      ),
+      avgFlowScore: Math.round(sessions.reduce((sum, session) => sum + session.flowScore, 0) / sessions.length),
+      avgDuration: Math.round(sessions.reduce((sum, session) => sum + session.duration, 0) / sessions.length),
       totalSessions: sessions.length,
-      avgHeartRate: Math.round(
-        sessions.reduce((sum, session) => sum + session.avgHeartRate, 0) / sessions.length
-      ),
+      avgHeartRate: Math.round(sessions.reduce((sum, session) => sum + session.avgHeartRate, 0) / sessions.length),
     };
   }, [sessions]);
 
@@ -514,281 +457,208 @@ export default function SessionHistory() {
   if (!isReady) return <DashboardSkeleton />;
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-10 border-b bg-card/50 backdrop-blur-sm">
-        <div className="container mx-auto flex items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-4">
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
             <Button variant="ghost" size="icon" onClick={handleBack}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
-
-            <div>
-              <h1 className="text-xl font-bold">Session History</h1>
-              <p className="text-sm text-muted-foreground">
-                View past listening sessions and biometric data
-              </p>
-            </div>
+            <h1 className="text-3xl font-bold">Session History</h1>
           </div>
-
-          <div className="flex items-center gap-4">
-            <SessionExportButton sessions={filteredSessions} />
-
-            <Select value={timeRange} onValueChange={handleTimeRangeChange}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7d">Last 7 days</SelectItem>
-                <SelectItem value="30d">Last 30 days</SelectItem>
-                <SelectItem value="90d">Last 90 days</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={activityFilter} onValueChange={handleActivityFilterChange}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="All activities" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All activities</SelectItem>
-                <SelectItem value="sleep">Sleep</SelectItem>
-                <SelectItem value="workout">Workout</SelectItem>
-                <SelectItem value="study">Study</SelectItem>
-                <SelectItem value="relax">Relax</SelectItem>
-                <SelectItem value="commute">Commute</SelectItem>
-                <SelectItem value="meditation">Meditation</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <p className="text-muted-foreground ml-12">View past listening sessions and biometric data</p>
         </div>
-      </header>
+        <SessionExportButton sessions={sessions} />
+      </div>
 
-      <main className="container mx-auto space-y-8 px-4 py-8 pb-24">
-        {isLoading ? (
-          <ChartSkeleton />
-        ) : sessions.length === 0 ? (
-          <Card className="p-8">
+      <div className="flex gap-2 items-center">
+        <Select value={timeRange} onValueChange={handleTimeRangeChange}>
+          <SelectTrigger className="w-32">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="7d">Last 7 days</SelectItem>
+            <SelectItem value="30d">Last 30 days</SelectItem>
+            <SelectItem value="90d">Last 90 days</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={activityFilter} onValueChange={handleActivityFilterChange}>
+          <SelectTrigger className="w-32">
+            <SelectValue placeholder="All activities" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All activities</SelectItem>
+            <SelectItem value="sleep">Sleep</SelectItem>
+            <SelectItem value="workout">Workout</SelectItem>
+            <SelectItem value="study">Study</SelectItem>
+            <SelectItem value="relax">Relax</SelectItem>
+            <SelectItem value="commute">Commute</SelectItem>
+            <SelectItem value="meditation">Meditation</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {isLoading ? (
+        <ChartSkeleton />
+      ) : error ? (
+        <Card>
+          <CardContent className="pt-6">
             <EmptyState
-              icon={Calendar}
-              title="No sessions yet"
-              description="Start your first listening session to see your history and progress here."
-              actionLabel="Go to Dashboard"
-              onAction={handleGoToDashboard}
+              icon={Activity}
+              title="Failed to load sessions"
+              description={error}
+              action={<Button onClick={() => window.location.reload()}>Retry</Button>}
             />
+          </CardContent>
+        </Card>
+      ) : sessions.length === 0 ? (
+        <EmptyState
+          icon={Music}
+          title="No sessions yet"
+          description="Start a listening session to see your history here"
+          action={<Button onClick={handleGoToDashboard}>Go to Dashboard</Button>}
+        />
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-4xl font-bold">{averageStats.totalSessions}</CardTitle>
+                <CardDescription>Total Sessions</CardDescription>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-4xl font-bold">{averageStats.avgFlowScore}%</CardTitle>
+                <CardDescription>Avg Flow Score</CardDescription>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-4xl font-bold">{averageStats.avgDuration}m</CardTitle>
+                <CardDescription>Avg Duration</CardDescription>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-4xl font-bold">{averageStats.avgHeartRate}</CardTitle>
+                <CardDescription>Avg Heart Rate</CardDescription>
+              </CardHeader>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Flow Score Trend</CardTitle>
+                <CardDescription>Your flow state progress over time</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={flowTrendData}>
+                    <defs>
+                      <linearGradient id="colorFlow" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <Tooltip contentStyle={chartTooltipStyle} />
+                    <Area
+                      type="monotone"
+                      dataKey="flow"
+                      stroke="hsl(var(--primary))"
+                      fill="url(#colorFlow)"
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Activity Distribution</CardTitle>
+                <CardDescription>Sessions by activity type</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={activityChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                    <Tooltip contentStyle={chartTooltipStyle} />
+                    <Bar dataKey="sessions" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Mood Impact</CardTitle>
+              <CardDescription>How music affects your mood</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <p className="text-2xl font-bold mb-1">{moodImprovement.improved}</p>
+                  <p className="text-sm text-muted-foreground mb-2">Improved</p>
+                  <Progress
+                    value={sessions.length > 0 ? (moodImprovement.improved / sessions.length) * 100 : 0}
+                    className="mt-2 h-2"
+                  />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold mb-1">{moodImprovement.same}</p>
+                  <p className="text-sm text-muted-foreground mb-2">Unchanged</p>
+                  <Progress
+                    value={sessions.length > 0 ? (moodImprovement.same / sessions.length) * 100 : 0}
+                    className="mt-2 h-2"
+                  />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold mb-1">{moodImprovement.declined}</p>
+                  <p className="text-sm text-muted-foreground mb-2">Declined</p>
+                  <Progress
+                    value={sessions.length > 0 ? (moodImprovement.declined / sessions.length) * 100 : 0}
+                    className="mt-2 h-2"
+                  />
+                </div>
+              </div>
+            </CardContent>
           </Card>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-4">
-                    <div className="rounded-full bg-primary/20 p-3">
-                      <Activity className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold">{averageStats.totalSessions}</p>
-                      <p className="text-sm text-muted-foreground">Total Sessions</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
 
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-4">
-                    <div className="rounded-full bg-green-500/20 p-3">
-                      <Sparkles className="h-6 w-6 text-green-500" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold">{averageStats.avgFlowScore}%</p>
-                      <p className="text-sm text-muted-foreground">Avg Flow Score</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-4">
-                    <div className="rounded-full bg-blue-500/20 p-3">
-                      <Clock className="h-6 w-6 text-blue-500" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold">{averageStats.avgDuration}m</p>
-                      <p className="text-sm text-muted-foreground">Avg Duration</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-4">
-                    <div className="rounded-full bg-red-500/20 p-3">
-                      <Heart className="h-6 w-6 text-red-500" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold">{averageStats.avgHeartRate}</p>
-                      <p className="text-sm text-muted-foreground">Avg Heart Rate</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-primary" />
-                    Flow Score Trend
-                  </CardTitle>
-                  <CardDescription>Your flow state progress over time</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[250px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={flowTrendData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis
-                          dataKey="date"
-                          tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                        />
-                        <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                        <Tooltip contentStyle={chartTooltipStyle} />
-                        <Area
-                          type="monotone"
-                          dataKey="flow"
-                          name="Flow Score"
-                          stroke="hsl(var(--primary))"
-                          fill="hsl(var(--primary))"
-                          fillOpacity={0.3}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="focus"
-                          name="Focus"
-                          stroke="#f59e0b"
-                          fill="#f59e0b"
-                          fillOpacity={0.2}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-primary" />
-                    Activity Distribution
-                  </CardTitle>
-                  <CardDescription>Sessions by activity type</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[250px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={activityChartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis
-                          dataKey="name"
-                          tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                        />
-                        <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                        <Tooltip contentStyle={chartTooltipStyle} />
-                        <Bar dataKey="sessions" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Smile className="h-5 w-5 text-primary" />
-                  Mood Impact
-                </CardTitle>
-                <CardDescription>How music affects your mood</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4 text-center">
-                    <p className="text-3xl font-bold text-green-500">{moodImprovement.improved}</p>
-                    <p className="text-sm text-muted-foreground">Improved</p>
-                    <Progress
-                      value={
-                        sessions.length > 0
-                          ? (moodImprovement.improved / sessions.length) * 100
-                          : 0
-                      }
-                      className="mt-2 h-2"
-                    />
-                  </div>
-
-                  <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 text-center">
-                    <p className="text-3xl font-bold text-yellow-500">{moodImprovement.same}</p>
-                    <p className="text-sm text-muted-foreground">Unchanged</p>
-                    <Progress
-                      value={
-                        sessions.length > 0 ? (moodImprovement.same / sessions.length) * 100 : 0
-                      }
-                      className="mt-2 h-2"
-                    />
-                  </div>
-
-                  <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-center">
-                    <p className="text-3xl font-bold text-red-500">{moodImprovement.declined}</p>
-                    <p className="text-sm text-muted-foreground">Declined</p>
-                    <Progress
-                      value={
-                        sessions.length > 0
-                          ? (moodImprovement.declined / sessions.length) * 100
-                          : 0
-                      }
-                      className="mt-2 h-2"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-primary" />
-                  Session Details
-                </CardTitle>
-                <CardDescription>
-                  {filteredSessions.length} sessions in the selected period
-                </CardDescription>
-              </CardHeader>
-
-              <CardContent>
-                <div className="space-y-4">
-                  {filteredSessions.length === 0 ? (
-                    <EmptyState
-                      icon={Calendar}
-                      title="No sessions found"
-                      description="Try changing the time range or activity filter."
-                    />
-                  ) : (
-                    filteredSessions.map((session) => (
-                      <SessionRow
-                        key={session.id}
-                        session={session}
-                        isExpanded={expandedSession === session.id}
-                        onToggle={handleToggleExpandedSession}
-                      />
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </main>
+          <Card>
+            <CardHeader>
+              <CardTitle>Session Details</CardTitle>
+              <CardDescription>{filteredSessions.length} sessions in the selected period</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {filteredSessions.length === 0 ? (
+                <EmptyState
+                  icon={Activity}
+                  title="No sessions found"
+                  description="Try adjusting your filters"
+                />
+              ) : (
+                filteredSessions.map((session) => (
+                  <SessionRow
+                    key={session.id}
+                    session={session}
+                    isExpanded={expandedSession === session.id}
+                    onToggle={handleToggleExpandedSession}
+                  />
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
