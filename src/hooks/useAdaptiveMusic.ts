@@ -8,7 +8,6 @@ export interface BiometricState {
   focusScore: number;
   relaxationScore: number;
   flowState: "none" | "entering" | "in-flow" | "exiting";
-  // EEG data (optional)
   eegAlpha?: number;
   eegBeta?: number;
   eegTheta?: number;
@@ -50,8 +49,16 @@ interface CurrentSong {
   energy?: number;
 }
 
+// Typed user preferences — replaces previous `any` that bypassed TypeScript
+interface UserPreferences {
+  preferredGenres?: string[];
+  avoidedGenres?: string[];
+  preferredTempoRange?: [number, number];
+  preferredEnergyRange?: [number, number];
+}
+
 export function useAdaptiveMusic(activityType: string = "study") {
-  const userPreferencesRef = useRef<any>(null);
+  const userPreferencesRef = useRef<UserPreferences | null>(null);
   const [state, setState] = useState<AdaptiveMusicState>({
     isEnabled: false,
     isLoading: false,
@@ -64,16 +71,13 @@ export function useAdaptiveMusic(activityType: string = "study") {
   const updateInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastBiometricState = useRef<BiometricState | null>(null);
   const currentSongRef = useRef<CurrentSong | null>(null);
-  // Tracks in-flight request so we can abort stale fetches
   const abortControllerRef = useRef<AbortController | null>(null);
-  // Tracks whether component is still mounted to guard setState calls
   const isMountedRef = useRef(true);
 
   const fetchRecommendation = useCallback(async (
     biometricState: BiometricState,
     targetFlowState: string = "in-flow"
   ) => {
-    // Abort any in-flight request before starting a new one
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -91,11 +95,10 @@ export function useAdaptiveMusic(activityType: string = "study") {
           currentSong: currentSongRef.current,
           targetFlowState,
           recentReadings: biometricHistory.current.slice(-10),
-          userPreferences: userPreferencesRef.current || undefined,
+          userPreferences: userPreferencesRef.current ?? undefined,
         },
       });
 
-      // If this request was aborted (superseded), discard the result
       if (controller.signal.aborted) return null;
 
       if (error) {
@@ -123,7 +126,6 @@ export function useAdaptiveMusic(activityType: string = "study") {
       }
       return recommendation;
     } catch (err) {
-      // Ignore abort errors — they are intentional
       if (err instanceof Error && err.name === "AbortError") return null;
       const errorMessage = err instanceof Error ? err.message : "Failed to get recommendation";
       if (isMountedRef.current) {
@@ -142,23 +144,20 @@ export function useAdaptiveMusic(activityType: string = "study") {
     currentSongRef.current = song;
   }, []);
 
-  const setUserPreferences = useCallback((preferences: any) => {
+  const setUserPreferences = useCallback((preferences: UserPreferences) => {
     userPreferencesRef.current = preferences;
   }, []);
 
   const enable = useCallback((intervalMs: number = 30000) => {
     setState(prev => ({ ...prev, isEnabled: true }));
-    // Clear any existing interval
     if (updateInterval.current) {
       clearInterval(updateInterval.current);
     }
-    // Set up periodic recommendation updates
     updateInterval.current = setInterval(() => {
       if (lastBiometricState.current && biometricHistory.current.length >= 3) {
         fetchRecommendation(lastBiometricState.current);
       }
     }, intervalMs);
-    // Get initial recommendation if we have data
     if (lastBiometricState.current) {
       fetchRecommendation(lastBiometricState.current);
     }
@@ -170,7 +169,6 @@ export function useAdaptiveMusic(activityType: string = "study") {
       clearInterval(updateInterval.current);
       updateInterval.current = null;
     }
-    // Cancel any in-flight request when the feature is disabled
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -185,7 +183,6 @@ export function useAdaptiveMusic(activityType: string = "study") {
     return fetchRecommendation(lastBiometricState.current);
   }, [fetchRecommendation]);
 
-  // Cleanup on unmount: cancel timers and in-flight requests
   useEffect(() => {
     isMountedRef.current = true;
     return () => {

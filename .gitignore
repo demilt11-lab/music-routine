@@ -23,10 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 
-# Environment variables - NEVER commit real .env files
+# Environment variables — NEVER commit real credentials
 .env
 .env.local
 .env.production
+.env.staging
 .env.*.local
-# Allow the example template
+# Allow the example template only
 !.env.example

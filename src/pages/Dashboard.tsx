@@ -32,6 +32,7 @@ import {
   Calendar,
   Settings,
   ExternalLink,
+  Loader2,
 } from "lucide-react";
 import { MusicTabs } from "@/components/music/MusicTabs";
 import { BiometricMonitor } from "@/components/biometrics/BiometricMonitor";
@@ -47,7 +48,7 @@ import { SectionErrorBoundary } from "@/components/SectionErrorBoundary";
 import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { ChartSkeleton } from "@/components/skeletons/ListSkeleton";
-import { useActivityTypes, useUserProfile, useRecentPlaylists } from "@/hooks/useDashboardData";
+import { useActivityTypes, useUserProfile, useRecentPlaylists, useUserSessions } from "@/hooks/useDashboardData";
 import { useAuthReady } from "@/hooks/useAuthReady";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -175,7 +176,8 @@ const DashboardHeader = memo(function DashboardHeader({
             <BarChart3 className="mr-2 h-4 w-4" />
             Weekly
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => onNavigate("/monthly")}>
+          {/* Fix: was /monthly (no route) — corrected to /progress */}
+          <Button variant="ghost" size="sm" onClick={() => onNavigate("/progress")}>
             <Calendar className="mr-2 h-4 w-4" />
             Monthly
           </Button>
@@ -202,10 +204,14 @@ const ActivityPlaylistBrowser = memo(function ActivityPlaylistBrowser({
   activityTypes,
   expandedActivity,
   onToggleActivity,
+  onGeneratePlaylist,
+  generatingActivity,
 }: {
   activityTypes: ActivityType[];
   expandedActivity: string | null;
   onToggleActivity: (activityName: string) => void;
+  onGeneratePlaylist: (activityName: string) => void;
+  generatingActivity: string | null;
 }) {
   const expandedPlaylists = useMemo(
     () => (expandedActivity ? curatedPlaylists[expandedActivity] ?? [] : []),
@@ -227,6 +233,7 @@ const ActivityPlaylistBrowser = memo(function ActivityPlaylistBrowser({
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {activityTypes.map((activity) => {
           const isExpanded = expandedActivity === activity.name;
+          const isGenerating = generatingActivity === activity.name;
           const Icon = activityIconMap[activity.name] ?? Music;
 
           return (
@@ -246,10 +253,27 @@ const ActivityPlaylistBrowser = memo(function ActivityPlaylistBrowser({
                 <CardDescription className="text-xs">{activity.description}</CardDescription>
               </CardHeader>
 
-              <CardContent>
+              <CardContent className="space-y-2">
                 <Button className="w-full" variant={isExpanded ? "secondary" : "default"} size="sm">
                   <Sparkles className="mr-2 h-4 w-4" />
                   {isExpanded ? "Hide" : "Browse"}
+                </Button>
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  size="sm"
+                  disabled={isGenerating}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onGeneratePlaylist(activity.name);
+                  }}
+                >
+                  {isGenerating ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 h-4 w-4" />
+                  )}
+                  {isGenerating ? "Generating..." : "AI Playlist"}
                 </Button>
               </CardContent>
             </Card>
@@ -312,14 +336,14 @@ const RecentPlaylistsSection = memo(function RecentPlaylistsSection({
 
   return (
     <section>
-      <h2 className="mb-4 text-xl font-semibold">Recent Playlists</h2>
+      <h2 className="mb-4 text-xl font-semibold">Recent AI Playlists</h2>
 
       {playlists.length === 0 ? (
         <Card className="p-8">
           <EmptyState
             icon={ListMusic}
-            title="No playlists yet"
-            description="Generate your first playlist by selecting an activity above!"
+            title="No AI playlists yet"
+            description="Hit \"AI Playlist\" on any activity above to generate a personalized playlist."
             actionLabel="Scroll to Activities"
             onAction={handleScrollToTop}
           />
@@ -389,6 +413,7 @@ const DashboardAnalytics = memo(function DashboardAnalytics() {
 const Dashboard = () => {
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [generatingActivity, setGeneratingActivity] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -397,6 +422,7 @@ const Dashboard = () => {
   const { data: activityTypes = [] } = useActivityTypes();
   const { data: profile } = useUserProfile(user?.id);
   const { data: playlists = [] } = useRecentPlaylists(user?.id);
+  const { data: sessions = [] } = useUserSessions(user?.id);
 
   useEffect(() => {
     if (isReady && !user) {
@@ -413,6 +439,7 @@ const Dashboard = () => {
   }, []);
 
   const displayName = profile?.display_name ?? "";
+  const sessionCount = sessions.length;
   const typedPlaylists = useMemo(
     () => playlists as GeneratedPlaylist[],
     [playlists]
@@ -437,6 +464,7 @@ const Dashboard = () => {
 
   const handleGeneratePlaylist = useCallback(
     async (activityName: string) => {
+      setGeneratingActivity(activityName);
       try {
         const { data, error } = await supabase.functions.invoke("generate-playlist", {
           body: {
@@ -459,12 +487,12 @@ const Dashboard = () => {
       } catch (error) {
         console.error("Error generating playlist:", error);
         toast.error(error instanceof Error ? error.message : "Failed to generate playlist");
+      } finally {
+        setGeneratingActivity(null);
       }
     },
     [queryClient]
   );
-
-  void handleGeneratePlaylist;
 
   if (!isReady) {
     return <DashboardSkeleton />;
@@ -483,8 +511,11 @@ const Dashboard = () => {
           <h1 className="mb-2 text-3xl font-bold">
             Welcome back{displayName ? `, ${displayName}` : ""}! 👋
           </h1>
+          {/* Fix: replaced Lovable template string with contextual session count */}
           <p className="text-muted-foreground">
-            Play music from multiple sources - no API keys required!
+            {sessionCount > 0
+              ? `${sessionCount} session${sessionCount === 1 ? "" : "s"} logged. Keep the momentum going.`
+              : "Start your first session to begin tracking your flow state."}
           </p>
         </section>
 
@@ -557,6 +588,8 @@ const Dashboard = () => {
           activityTypes={activityTypes as ActivityType[]}
           expandedActivity={expandedActivity}
           onToggleActivity={handleToggleActivity}
+          onGeneratePlaylist={handleGeneratePlaylist}
+          generatingActivity={generatingActivity}
         />
 
         <RecentPlaylistsSection playlists={typedPlaylists} />

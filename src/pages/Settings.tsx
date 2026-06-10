@@ -1,4 +1,4 @@
-import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { supabase } from "@/integrations/supabase/client";
@@ -315,6 +315,10 @@ const Settings = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Track the last-saved form so hasUnsavedChanges compares against server
+  // values, not hardcoded defaults (which caused the button to always be enabled)
+  const savedFormRef = useRef<SettingsForm>(defaultForm);
+
   useEffect(() => {
     if (isReady && !user) {
       navigate("/auth", { replace: true });
@@ -349,7 +353,7 @@ const Settings = () => {
           ? (data.preferences as Record<string, unknown>)
           : {};
 
-      setForm({
+      const loaded: SettingsForm = {
         displayName: data?.display_name ?? "",
         avatarUrl: data?.avatar_url ?? "",
         preferences: {
@@ -360,7 +364,11 @@ const Settings = () => {
           achievementAlerts: (preferenceSource.achievementAlerts as boolean) ?? true,
           weeklySummaryEmails: (preferenceSource.weeklySummaryEmails as boolean) ?? false,
         },
-      });
+      };
+
+      // Set both the live form AND the saved baseline so the diff is correct
+      setForm(loaded);
+      savedFormRef.current = loaded;
 
       setIsLoading(false);
     };
@@ -372,20 +380,18 @@ const Settings = () => {
     };
   }, [isReady, user]);
 
+  // Compare against server-loaded values, not hardcoded defaults
   const hasUnsavedChanges = useMemo(() => {
-    return (
-      form.displayName !== defaultForm.displayName ||
-      form.avatarUrl !== defaultForm.avatarUrl ||
-      JSON.stringify(form.preferences) !== JSON.stringify(defaultForm.preferences)
-    );
+    return JSON.stringify(form) !== JSON.stringify(savedFormRef.current);
   }, [form]);
 
   const handleBack = useCallback(() => {
     navigate("/dashboard");
   }, [navigate]);
 
+  // Fix: was navigating to /feedback (404) — corrected to /track-feedback
   const handleFeedbackNavigate = useCallback(() => {
-    navigate("/feedback");
+    navigate("/track-feedback");
   }, [navigate]);
 
   const handleFieldChange = useCallback(
@@ -443,6 +449,8 @@ const Settings = () => {
       return;
     }
 
+    // Update the saved baseline so hasUnsavedChanges resets to false
+    savedFormRef.current = form;
     toast.success("Profile updated!");
     setIsSaving(false);
   }, [form, isSaving, user]);

@@ -58,6 +58,7 @@ export function useUserSessions(userId: string | undefined) {
   });
 }
 
+// Fix: added .eq("user_id", userId!) to prevent leaking other users' playlists
 export function useRecentPlaylists(userId: string | undefined) {
   return useQuery({
     queryKey: ["recent-playlists", userId],
@@ -65,6 +66,7 @@ export function useRecentPlaylists(userId: string | undefined) {
       const { data, error } = await supabase
         .from("generated_playlists")
         .select("*, activity_types(name)")
+        .eq("user_id", userId!)
         .order("created_at", { ascending: false })
         .limit(5);
       if (error) throw error;
@@ -91,6 +93,7 @@ export function useSessionBiometrics(sessionId: string | undefined) {
   });
 }
 
+// Fix: added .limit(500) to prevent unbounded query that could OOM the browser
 export function useAllBiometrics(userId: string | undefined) {
   return useQuery({
     queryKey: ["all-biometrics", userId],
@@ -98,7 +101,9 @@ export function useAllBiometrics(userId: string | undefined) {
       const { data, error } = await supabase
         .from("biometric_readings")
         .select("*")
-        .eq("user_id", userId!);
+        .eq("user_id", userId!)
+        .order("recorded_at", { ascending: false })
+        .limit(500);
       if (error) throw error;
       return data;
     },
