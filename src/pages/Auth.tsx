@@ -89,7 +89,7 @@ const Auth = () => {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`
+            emailRedirectTo: `${window.location.origin}/auth/callback`
           }
         });
         if (error) {
@@ -125,21 +125,19 @@ const Auth = () => {
     }
   };
 
-  // Fix: replaced lovable.auth.signInWithOAuth (Lovable platform wrapper — fails
-  // outside the Lovable preview) with supabase.auth.signInWithOAuth directly.
   const handleOAuthSignIn = async (provider: "google" | "apple") => {
     setIsLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        // Must match what's registered in Google Cloud Console and Supabase
+        redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
     if (error) {
       toast.error(`${provider === "google" ? "Google" : "Apple"} sign-in failed: ${error.message}`);
       setIsLoading(false);
     }
-    // On success, Supabase redirects the browser — no need to reset loading state
   };
 
   return (
