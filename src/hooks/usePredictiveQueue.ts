@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 
 interface PredictedSegment {
@@ -28,7 +28,7 @@ interface QueuedTrack {
 }
 
 interface BiometricTrend {
-  focusTrend: number; // positive = increasing, negative = decreasing
+  focusTrend: number;
   stressTrend: number;
   relaxationTrend: number;
   avgHeartRate: number;
@@ -38,9 +38,11 @@ interface PredictiveQueueState {
   isBuilding: boolean;
   segments: PredictedSegment[];
   predictedQueue: QueuedTrack[];
-  totalDuration: number; // minutes
+  totalDuration: number;
   currentSegment: number;
   biometricTrend: BiometricTrend | null;
+  // FIX BUG-001: store activityType so recalculateFromSegment uses it
+  activityType: string;
 }
 
 interface UsePredictiveQueueReturn {
@@ -62,13 +64,18 @@ interface UsePredictiveQueueReturn {
 
 // Activity-specific baseline targets
 const activityTargets: Record<string, { focus: number; relaxation: number; energy: number; tempo: number }> = {
-  study: { focus: 80, relaxation: 50, energy: 0.5, tempo: 100 },
-  workout: { focus: 60, relaxation: 30, energy: 0.85, tempo: 140 },
-  sleep: { focus: 20, relaxation: 90, energy: 0.2, tempo: 60 },
-  relax: { focus: 40, relaxation: 80, energy: 0.35, tempo: 75 },
-  meditation: { focus: 70, relaxation: 85, energy: 0.25, tempo: 65 },
-  commute: { focus: 50, relaxation: 60, energy: 0.6, tempo: 110 },
+  study:      { focus: 80, relaxation: 50, energy: 0.50, tempo: 100 },
+  workout:    { focus: 60, relaxation: 30, energy: 0.85, tempo: 140 },
+  sleep:      { focus: 20, relaxation: 90, energy: 0.20, tempo:  60 },
+  relax:      { focus: 40, relaxation: 80, energy: 0.35, tempo:  75 },
+  meditation: { focus: 70, relaxation: 85, energy: 0.25, tempo:  65 },
+  commute:    { focus: 50, relaxation: 60, energy: 0.60, tempo: 110 },
 };
+
+// FIX BUG-002: Activities where stress naturally DECAYS (opposite of creep)
+const stressDecayActivities = new Set(['sleep', 'relax', 'meditation']);
+// Activities where mild stress creep is physiologically expected
+const stressCreepActivities = new Set(['workout', 'commute', 'study']);
 
 export function usePredictiveQueue(): UsePredictiveQueueReturn {
   const [state, setState] = useState<PredictiveQueueState>({
@@ -78,11 +85,11 @@ export function usePredictiveQueue(): UsePredictiveQueueReturn {
     totalDuration: 30,
     currentSegment: 0,
     biometricTrend: null,
+    activityType: 'study',
   });
 
-  const segmentDuration = 5; // 5-minute segments
+  const segmentDuration = 5;
 
-  // Predict biometric state for a future segment based on current state and trends
   const predictSegmentState = useCallback((
     minutesFromNow: number,
     currentState: { focus: number; relaxation: number; stress: number },
@@ -90,90 +97,91 @@ export function usePredictiveQueue(): UsePredictiveQueueReturn {
     activityType: string,
     goalFlowScore?: number
   ): { focus: number; relaxation: number; stress: number; flow: number } => {
-    const target = activityTargets[activityType.toLowerCase()] || activityTargets.study;
-    
-    // Natural regression toward activity baseline over time
-    const regressionFactor = Math.min(minutesFromNow / 30, 0.5); // Max 50% regression
-    
+    const key = activityType.toLowerCase();
+    const target = activityTargets[key] ?? activityTargets.study;
+    const regressionFactor = Math.min(minutesFromNow / 30, 0.5);
+
     let predictedFocus = currentState.focus;
     let predictedRelaxation = currentState.relaxation;
     let predictedStress = currentState.stress;
 
-    // Apply trends if available
     if (trend) {
-      predictedFocus += trend.focusTrend * (minutesFromNow / 5);
+      predictedFocus      += trend.focusTrend      * (minutesFromNow / 5);
       predictedRelaxation += trend.relaxationTrend * (minutesFromNow / 5);
-      predictedStress += trend.stressTrend * (minutesFromNow / 5);
+      predictedStress     += trend.stressTrend     * (minutesFromNow / 5);
     }
 
-    // Natural regression toward baseline
-    predictedFocus = predictedFocus + (target.focus - predictedFocus) * regressionFactor;
+    // Natural regression toward activity baseline
+    predictedFocus      = predictedFocus      + (target.focus      - predictedFocus)      * regressionFactor;
     predictedRelaxation = predictedRelaxation + (target.relaxation - predictedRelaxation) * regressionFactor;
-    
-    // Stress tends to creep up over time without intervention
-    const stressCreep = minutesFromNow * 0.3; // 0.3% per minute
-    predictedStress = Math.min(100, predictedStress + stressCreep);
 
-    // Clamp values
-    predictedFocus = Math.max(0, Math.min(100, predictedFocus));
+    // FIX BUG-002: Activity-aware stress model
+    if (stressDecayActivities.has(key)) {
+      // Sleep / relax / meditation: stress decays toward a low baseline
+      const stressDecay = minutesFromNow * 0.4;
+      predictedStress = Math.max(5, predictedStress - stressDecay);
+    } else if (stressCreepActivities.has(key)) {
+      // Workout / commute / study: mild creep, capped at 60
+      const stressCreep = minutesFromNow * 0.2;
+      predictedStress = Math.min(60, predictedStress + stressCreep);
+    }
+    // else: neutral — no model adjustment, trend drives it
+
+    predictedFocus      = Math.max(0, Math.min(100, predictedFocus));
     predictedRelaxation = Math.max(0, Math.min(100, predictedRelaxation));
-    predictedStress = Math.max(0, Math.min(100, predictedStress));
+    predictedStress     = Math.max(0, Math.min(100, predictedStress));
 
     const flow = (predictedFocus + predictedRelaxation) / 2;
-
     return { focus: predictedFocus, relaxation: predictedRelaxation, stress: predictedStress, flow };
   }, []);
 
-  // Calculate recommended music characteristics for a segment
   const calculateMusicRecommendation = useCallback((
     predictedState: { focus: number; relaxation: number; stress: number; flow: number },
     activityType: string,
     goalFlowScore?: number
   ): { tempo: number; energy: number; reason: string } => {
-    const target = activityTargets[activityType.toLowerCase()] || activityTargets.study;
-    const goalScore = goalFlowScore || 70;
-    
+    const key = activityType.toLowerCase();
+    const target = activityTargets[key] ?? activityTargets.study;
+    const goalScore = goalFlowScore ?? 70;
+
     let tempo = target.tempo;
     let energy = target.energy;
-    let reasons: string[] = [];
+    const reasons: string[] = [];
 
-    // Adjust based on predicted state
     const flowGap = goalScore - predictedState.flow;
 
     if (predictedState.stress > 60) {
-      tempo -= 15;
+      tempo  -= 15;
       energy -= 0.15;
       reasons.push('Calming music to reduce predicted stress');
     }
 
-    if (predictedState.focus < 50 && activityType.toLowerCase() !== 'sleep') {
-      tempo += 10;
+    if (predictedState.focus < 50 && key !== 'sleep') {
+      tempo  += 10;
       energy += 0.1;
       reasons.push('Energizing to boost focus');
     }
 
     if (flowGap > 20) {
-      tempo += 5;
+      tempo  += 5;
       energy += 0.05;
       reasons.push('Optimizing for flow state');
     } else if (flowGap < -10) {
-      tempo -= 5;
+      tempo  -= 5;
       energy -= 0.05;
       reasons.push('Maintaining flow state');
     }
 
-    // Clamp values
-    tempo = Math.max(60, Math.min(160, tempo));
-    energy = Math.max(0.1, Math.min(1, energy));
+    tempo  = Math.max(60,  Math.min(160, tempo));
+    energy = Math.max(0.1, Math.min(1,   energy));
 
     return {
-      tempo: Math.round(tempo),
+      tempo:  Math.round(tempo),
       energy: Math.round(energy * 100) / 100,
       reason: reasons.length > 0 ? reasons.join('. ') : 'Baseline activity music',
     };
   }, []);
 
-  // Build the predictive queue for the specified duration
   const buildQueue = useCallback(async (
     durationMinutes: number,
     activityType: string,
@@ -188,14 +196,14 @@ export function usePredictiveQueue(): UsePredictiveQueueReturn {
       const segments: PredictedSegment[] = [];
 
       for (let i = 0; i < numSegments; i++) {
-        const startMinute = i * segmentDuration;
-        const endMinute = Math.min((i + 1) * segmentDuration, durationMinutes);
+        const startMinute   = i * segmentDuration;
+        const endMinute     = Math.min((i + 1) * segmentDuration, durationMinutes);
         const midpointMinute = (startMinute + endMinute) / 2;
 
         const predictedState = predictSegmentState(
           midpointMinute,
           currentBiometrics,
-          historicalTrend || null,
+          historicalTrend ?? null,
           activityType,
           goalFlowScore
         );
@@ -206,29 +214,30 @@ export function usePredictiveQueue(): UsePredictiveQueueReturn {
           startMinute,
           endMinute,
           predictedState: {
-            focus: Math.round(predictedState.focus),
+            focus:      Math.round(predictedState.focus),
             relaxation: Math.round(predictedState.relaxation),
-            stress: Math.round(predictedState.stress),
-            flow: Math.round(predictedState.flow),
+            stress:     Math.round(predictedState.stress),
+            flow:       Math.round(predictedState.flow),
           },
-          recommendedTempo: musicRec.tempo,
+          recommendedTempo:  musicRec.tempo,
           recommendedEnergy: musicRec.energy,
-          reason: musicRec.reason,
+          reason:            musicRec.reason,
         });
       }
 
+      // FIX BUG-001: persist activityType in state
       setState(prev => ({
         ...prev,
         isBuilding: false,
         segments,
         totalDuration: durationMinutes,
         currentSegment: 0,
-        biometricTrend: historicalTrend || null,
+        biometricTrend: historicalTrend ?? null,
+        activityType,
       }));
 
       toast.success(`Built ${numSegments} segments for ${durationMinutes}-minute session`);
       return segments;
-
     } catch (error) {
       console.error('Error building predictive queue:', error);
       toast.error('Failed to build predictive queue');
@@ -237,7 +246,6 @@ export function usePredictiveQueue(): UsePredictiveQueueReturn {
     }
   }, [predictSegmentState, calculateMusicRecommendation]);
 
-  // Add tracks to a specific segment
   const addTracksToSegment = useCallback((segmentIndex: number, tracks: QueuedTrack[]) => {
     const tracksWithSegment = tracks.map(t => ({ ...t, segment: segmentIndex }));
     setState(prev => ({
@@ -246,12 +254,10 @@ export function usePredictiveQueue(): UsePredictiveQueueReturn {
     }));
   }, []);
 
-  // Get tracks for a specific segment
   const getSegmentTracks = useCallback((segmentIndex: number): QueuedTrack[] => {
     return state.predictedQueue.filter(t => t.segment === segmentIndex);
   }, [state.predictedQueue]);
 
-  // Advance to next segment
   const advanceSegment = useCallback(() => {
     setState(prev => ({
       ...prev,
@@ -259,7 +265,6 @@ export function usePredictiveQueue(): UsePredictiveQueueReturn {
     }));
   }, []);
 
-  // Clear the queue
   const clearQueue = useCallback(() => {
     setState({
       isBuilding: false,
@@ -268,15 +273,15 @@ export function usePredictiveQueue(): UsePredictiveQueueReturn {
       totalDuration: 30,
       currentSegment: 0,
       biometricTrend: null,
+      activityType: 'study',
     });
   }, []);
 
-  // Update biometric trend data
   const updateBiometricTrend = useCallback((trend: BiometricTrend) => {
     setState(prev => ({ ...prev, biometricTrend: trend }));
   }, []);
 
-  // Recalculate remaining segments from a given point
+  // FIX BUG-001: uses activityType from state instead of hardcoded 'study'
   const recalculateFromSegment = useCallback((
     segmentIndex: number,
     currentBiometrics: { focus: number; relaxation: number; stress: number }
@@ -284,7 +289,8 @@ export function usePredictiveQueue(): UsePredictiveQueueReturn {
     setState(prev => {
       if (segmentIndex >= prev.segments.length) return prev;
 
-      const activityType = 'study'; // Would need to pass this in
+      // Use stored activity type — no longer hardcoded
+      const activityType = prev.activityType;
       const updatedSegments = [...prev.segments];
 
       for (let i = segmentIndex; i < updatedSegments.length; i++) {
@@ -301,14 +307,14 @@ export function usePredictiveQueue(): UsePredictiveQueueReturn {
         updatedSegments[i] = {
           ...updatedSegments[i],
           predictedState: {
-            focus: Math.round(predictedState.focus),
+            focus:      Math.round(predictedState.focus),
             relaxation: Math.round(predictedState.relaxation),
-            stress: Math.round(predictedState.stress),
-            flow: Math.round(predictedState.flow),
+            stress:     Math.round(predictedState.stress),
+            flow:       Math.round(predictedState.flow),
           },
-          recommendedTempo: musicRec.tempo,
+          recommendedTempo:  musicRec.tempo,
           recommendedEnergy: musicRec.energy,
-          reason: musicRec.reason,
+          reason:            musicRec.reason,
         };
       }
 
