@@ -9,6 +9,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Loader2 } from "lucide-react";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import AuthCallback from "./pages/AuthCallback";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 import { MobileNavBar } from "./components/mobile/MobileNavBar";
@@ -28,13 +29,12 @@ const Install = lazy(() => import("./pages/Install"));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
       retry: 1,
       refetchOnWindowFocus: false,
     },
     mutations: {
-      // Log mutation errors for debugging (but avoid noisy UI toasts)
       onError: (error) => {
         console.error("Mutation error:", error);
       },
@@ -55,7 +55,6 @@ const isNonProductionHost = () => {
 };
 
 const App = () => {
-  // Suppress noisy unhandled promise rejections
   useEffect(() => {
     const handler = (event: PromiseRejectionEvent) => {
       console.error("Unhandled rejection:", event.reason);
@@ -65,7 +64,6 @@ const App = () => {
     return () => window.removeEventListener("unhandledrejection", handler);
   }, []);
 
-  // Clean up stale service workers in dev/preview environments
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
     if (!isNonProductionHost()) return;
@@ -96,6 +94,7 @@ const App = () => {
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
+                  <Route path="/auth/callback" element={<AuthCallback />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/history" element={<SessionHistory />} />
                   <Route path="/insights" element={<WeeklyInsights />} />
