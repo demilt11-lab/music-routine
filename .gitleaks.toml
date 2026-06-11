@@ -1,0 +1,20 @@
+title = "FLOWSTATE Gitleaks Configuration"
+
+[allowlist]
+  description = "Allowlisted patterns"
+  regexes = [
+    '''your-(.*)-key''',         # placeholder values in .env.example
+    '''your-project\.supabase''',
+  ]
+
+[[rules]]
+  id          = "supabase-service-role"
+  description = "Supabase service role key"
+  regex       = '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJyb2xlIjoic2VydmljZV9yb2xlIi'''
+  tags        = ["key", "supabase"]
+
+[[rules]]
+  id          = "spotify-client-secret"
+  description = "Spotify client secret"
+  regex       = '''SPOTIFY_CLIENT_SECRET\s*=\s*[a-zA-Z0-9]{32,}'''
+  tags        = ["key", "spotify"]
