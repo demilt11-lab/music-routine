@@ -48,7 +48,8 @@ export interface ClassificationResult {
 }
 
 // ── Activity Profiles ─────────────────────────────────────────
-const ACTIVITY_PROFILES: Record<string, ActivityProfile> = {
+// H-1: exported so playlist-engine can import instead of duplicating
+export const ACTIVITY_PROFILES: Record<string, ActivityProfile> = {
   strength_training: {
     activity_type: "strength_training",
     hr_min_pct: 0.70, hr_max_pct: 0.90,
@@ -72,7 +73,7 @@ const ACTIVITY_PROFILES: Record<string, ActivityProfile> = {
   },
   study: {
     activity_type: "study",
-    hr_min_pct: 0, hr_max_pct: 1,   // HR matters less; absolute BPM ~60-75
+    hr_min_pct: 0, hr_max_pct: 1,
     hr_optimal_min_pct: 0, hr_optimal_max_pct: 1,
     hrv_target: "high", eeg_target: "alpha",
     focus_threshold: 60, stress_max: 35,
@@ -107,7 +108,7 @@ const ACTIVITY_PROFILES: Record<string, ActivityProfile> = {
   },
 };
 
-// ── Classifier ────────────────────────────────────────────────
+// ── Classifier ──────────────────────────────────────────────
 export function classifyBiometricState(
   window: BiometricWindow,
   profile: ActivityProfile,
@@ -118,22 +119,24 @@ export function classifyBiometricState(
   // ── FLOW: gold standard – everything optimal + sustained ──
   const inOptimalHR = hrPct >= profile.hr_optimal_min_pct && hrPct <= profile.hr_optimal_max_pct;
   const hrStable    = window.hr_std < 5;
-  const hrvHigh     = window.hrv_rmssd_mean !== null && window.hrv_rmssd_mean > 50;
   const focusHigh   = window.focus_score_mean === null || window.focus_score_mean > 70;
   const alphaOk     = window.eeg_alpha_rel === null || window.eeg_alpha_rel > 0.3;
   const lowStress   = window.stress_score_mean === null || window.stress_score_mean < (profile.stress_max ?? 50);
   const sustained   = window.time_in_current_state_s >= 600; // 10 min
+  // H-6: hrvHigh is now actively gated in FLOW — removed dead variable, added inline
+  // Use 40 threshold (not 50) to avoid blocking trained athletes with naturally lower acute HRV
+  const hrvOk = window.hrv_rmssd_mean === null || window.hrv_rmssd_mean > 40;
 
-  if (inOptimalHR && hrStable && focusHigh && lowStress && alphaOk && sustained) {
-    signals.push("HR in optimal range", "stable variability", "focus high", "sustained 10+ min");
+  if (inOptimalHR && hrStable && focusHigh && lowStress && alphaOk && hrvOk && sustained) {
+    signals.push("HR in optimal range", "stable variability", "HRV adequate", "focus high", "sustained 10+ min");
     return { state: "FLOW", confidence: 0.90, key_signals: signals,
              time_in_state: window.time_in_current_state_s, transition_from: window.previous_state };
   }
 
-  // ── ANXIOUS ───────────────────────────────────────────────
-  const betaHigh = window.eeg_beta_rel !== null && window.eeg_beta_rel > 0.45;
+  // ── ANXIOUS ───────────────────────────────────────────
+  const betaHigh   = window.eeg_beta_rel !== null && window.eeg_beta_rel > 0.45;
   const stressHigh = window.stress_score_mean !== null && window.stress_score_mean > (profile.stress_max ?? 50);
-  const hrvDrop  = window.hrv_rmssd_mean !== null && window.hrv_rmssd_mean < 30;
+  const hrvDrop    = window.hrv_rmssd_mean !== null && window.hrv_rmssd_mean < 30;
   const hrElevated = hrPct > 0.75;
   if (betaHigh && stressHigh && hrElevated && hrvDrop) {
     signals.push("elevated beta", "high stress", "HRV drop");
@@ -141,22 +144,24 @@ export function classifyBiometricState(
              time_in_state: window.time_in_current_state_s, transition_from: window.previous_state };
   }
 
-  // ── OVEREXERTING ──────────────────────────────────────────
+  // ── OVEREXERTING ─────────────────────────────────────────
   if (hrPct > profile.hr_max_pct) {
     signals.push(`HR ${(hrPct * 100).toFixed(0)}% > ${(profile.hr_max_pct * 100).toFixed(0)}% max`);
     return { state: "OVEREXERTING", confidence: 0.88, key_signals: signals,
              time_in_state: window.time_in_current_state_s, transition_from: window.previous_state };
   }
 
-  // ── RECOVERING ────────────────────────────────────────────
-  const decliningHR = window.hr_trend < -0.5; // falling at >0.5 BPM/s
-  if (decliningHR && hrPct > 0.55 && window.previous_state === "OVEREXERTING") {
+  // ── RECOVERING ──────────────────────────────────────────
+  const decliningHR = window.hr_trend < -0.5; // falling > 0.5 BPM/s
+  // H-5: RECOVERING now triggers after both OVEREXERTING and FATIGUED
+  if (decliningHR && hrPct > 0.55 &&
+      (window.previous_state === "OVEREXERTING" || window.previous_state === "FATIGUED")) {
     signals.push("HR declining post-exertion");
     return { state: "RECOVERING", confidence: 0.80, key_signals: signals,
              time_in_state: window.time_in_current_state_s, transition_from: window.previous_state };
   }
 
-  // ── DROWSY ────────────────────────────────────────────────
+  // ── DROWSY ─────────────────────────────────────────────
   const thetaDominant = window.eeg_theta_rel !== null && window.eeg_theta_rel > 0.40;
   const focusLow      = window.focus_score_mean !== null && window.focus_score_mean < 35;
   const hrResting     = hrPct < 0.60;
@@ -166,16 +171,17 @@ export function classifyBiometricState(
              time_in_state: window.time_in_current_state_s, transition_from: window.previous_state };
   }
 
-  // ── DISTRACTED (study context) ────────────────────────────
-  const thetaRising = window.eeg_theta_rel !== null && window.eeg_theta_rel > 0.30;
+  // ── DISTRACTED (study + creative context) ───────────────────
+  // M-4: extended from study-only to include creative_work (both rely on sustained focus)
+  const thetaRising  = window.eeg_theta_rel !== null && window.eeg_theta_rel > 0.30;
   const focusFalling = window.focus_score_mean !== null && window.focus_score_mean < 45;
-  if (profile.activity_type === "study" && thetaRising && focusFalling) {
+  if (["study", "creative_work"].includes(profile.activity_type) && thetaRising && focusFalling) {
     signals.push("theta rising", "focus score falling");
     return { state: "DISTRACTED", confidence: 0.75, key_signals: signals,
              time_in_state: window.time_in_current_state_s, transition_from: window.previous_state };
   }
 
-  // ── FATIGUED ──────────────────────────────────────────────
+  // ── FATIGUED ─────────────────────────────────────────────
   const intensityDrop = window.activity_intensity_mean !== null && window.activity_intensity_mean < 3;
   const hrvFatigue    = window.hrv_rmssd_mean !== null && window.hrv_rmssd_mean < 25;
   if (decliningHR && intensityDrop && hrvFatigue) {
@@ -191,14 +197,14 @@ export function classifyBiometricState(
              time_in_state: window.time_in_current_state_s, transition_from: window.previous_state };
   }
 
-  // ── OPTIMAL ───────────────────────────────────────────────
+  // ── OPTIMAL (default) ────────────────────────────────────
   signals.push("all vitals in range");
   const confidence = inOptimalHR && hrStable ? 0.85 : 0.65;
   return { state: "OPTIMAL", confidence, key_signals: signals,
            time_in_state: window.time_in_current_state_s, transition_from: window.previous_state };
 }
 
-// ── BPM Transition Validator (C-16) ──────────────────────────
+// ── BPM Transition Validator ──────────────────────────────────
 export function validateBPMTransition(
   currentBPM: number,
   nextBPM: number,
@@ -213,7 +219,7 @@ export function validateBPMTransition(
   return { allowed: true };
 }
 
-// ── Speechiness Filter (C-17) ────────────────────────────────
+// ── Speechiness Filter ────────────────────────────────────────
 export function passesSpeechinessFilter(
   speechiness: number | null,
   activityType: string,
@@ -222,11 +228,11 @@ export function passesSpeechinessFilter(
   const strictActivities = ["study", "meditation", "sleep"];
   if (!strictActivities.includes(activityType)) return true;
   if (userOverride) return true;
-  if (speechiness === null) return true; // allow if unknown
+  if (speechiness === null) return true;
   return speechiness <= 0.3;
 }
 
-// ── HTTP handler ──────────────────────────────────────────────
+// ── HTTP handler ─────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
