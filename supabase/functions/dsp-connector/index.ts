@@ -8,8 +8,8 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "Authorization, Content-Type",
 };
 
-// ── Spotify token refresh ─────────────────────────────────────
-async function refreshSpotifyToken(refreshToken: string): Promise<string> {
+// ── Spotify token refresh ──────────────────────────────────────
+async function refreshSpotifyToken(refreshToken: string): Promise<{ access_token: string; expires_in: number }> {
   const clientId     = Deno.env.get("SPOTIFY_CLIENT_ID")!;
   const clientSecret = Deno.env.get("SPOTIFY_CLIENT_SECRET")!;
   const basic        = btoa(`${clientId}:${clientSecret}`);
@@ -24,10 +24,10 @@ async function refreshSpotifyToken(refreshToken: string): Promise<string> {
   });
   if (!res.ok) throw new Error(`Token refresh failed: ${res.status}`);
   const data = await res.json();
-  return data.access_token;
+  return { access_token: data.access_token, expires_in: data.expires_in ?? 3600 };
 }
 
-// ── Spotify playback helpers ──────────────────────────────────
+// ── Spotify playback helpers ──────────────────────────────
 async function spotifyRequest(
   method: string, path: string, accessToken: string, body?: unknown,
 ): Promise<Response> {
@@ -55,26 +55,50 @@ async function skipToNext(accessToken: string): Promise<void> {
   if (!res.ok && res.status !== 204) throw new Error(`Skip failed: ${res.status}`);
 }
 
-async function setRepeatOff(accessToken: string): Promise<void> {
-  await spotifyRequest("PUT", "/me/player/repeat?state=off", accessToken);
-}
-
 async function getCurrentPlayback(accessToken: string): Promise<unknown> {
   const res = await spotifyRequest("GET", "/me/player/currently-playing", accessToken);
-  if (res.status === 204) return null;
+  if (res.status === 204) return null; // authenticated but nothing playing
   if (!res.ok) throw new Error(`Playback state error: ${res.status}`);
   return res.json();
 }
 
-async function setCrossfade(seconds: number, accessToken: string): Promise<void> {
-  // Crossfade is a user setting in Spotify; can be surfaced via PUT /me/player but
-  // it's not exposed via Web API as of 2026 — we request it as a quality-of-life setting.
-  // When Spotify Premium supports it via API, the call is:
-  // PUT /me/player with { crossfade_seconds: seconds } — log intent for now.
-  console.log(`[dsp-connector] Crossfade requested: ${seconds}s (user setting)`);
+async function getDevices(accessToken: string): Promise<{ id: string; is_active: boolean; name: string }[]> {
+  const res = await spotifyRequest("GET", "/me/player/devices", accessToken);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.devices ?? [];
 }
 
-// ── Main handler ──────────────────────────────────────────────
+// CR-3: token refresh is now conditional — only fires when token is within 60s of expiry
+async function getValidAccessToken(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  tokenData: { music_user_token: string; refresh_token: string | null; token_expires_at: string | null },
+): Promise<string> {
+  const expiresAt = tokenData.token_expires_at
+    ? new Date(tokenData.token_expires_at).getTime()
+    : 0;
+  const needsRefresh = tokenData.refresh_token && Date.now() > expiresAt - 60_000;
+
+  if (!needsRefresh) return tokenData.music_user_token;
+
+  const { access_token, expires_in } = await refreshSpotifyToken(tokenData.refresh_token!);
+  await supabase.from("music_tokens").update({
+    music_user_token: access_token,
+    token_expires_at: new Date(Date.now() + expires_in * 1000).toISOString(),
+    updated_at:       new Date().toISOString(),
+  }).eq("user_id", userId).eq("provider", "spotify");
+
+  return access_token;
+}
+
+// H-7: crossfade is not controllable via Spotify Web API.
+// We expose a one-time session-start notification instead of a silent no-op.
+// When Spotify adds API support, implement it here.
+const CROSSFADE_USER_NOTE =
+  "Enable 8-second crossfade in Spotify Settings > Playback for the best reactive transitions.";
+
+// ── Main handler ────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
@@ -83,7 +107,6 @@ serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  // Verify JWT
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: CORS_HEADERS });
@@ -97,12 +120,11 @@ serve(async (req) => {
 
   try {
     const body   = await req.json();
-    const action = body.action as string; // queue_next | skip | get_playback | status_check
+    const action = body.action as string;
 
-    // Fetch user's Spotify tokens
     const { data: tokenData, error: tokenErr } = await supabase
       .from("music_tokens")
-      .select("*")
+      .select("music_user_token, refresh_token, token_expires_at")
       .eq("user_id", user.id)
       .eq("provider", "spotify")
       .single();
@@ -113,43 +135,64 @@ serve(async (req) => {
       });
     }
 
-    // Refresh token if needed (stored refresh_token assumed in music_tokens)
-    let accessToken = tokenData.music_user_token;
-    if (tokenData.refresh_token) {
-      try {
-        accessToken = await refreshSpotifyToken(tokenData.refresh_token);
-        // Update stored access token
-        await supabase.from("music_tokens")
-          .update({ music_user_token: accessToken, updated_at: new Date().toISOString() })
-          .eq("user_id", user.id).eq("provider", "spotify");
-      } catch (_) {
-        // Use existing token; will fail at Spotify if truly expired
-      }
-    }
+    // CR-3: conditional refresh — only when near expiry
+    const accessToken = await getValidAccessToken(supabase, user.id, tokenData);
 
     switch (action) {
       case "queue_next": {
-        // C-16: BPM jump validation is done in playlist-engine before this call
-        const { track_uri, crossfade_seconds } = body;
+        const { track_uri } = body;
         if (!track_uri) throw new Error("track_uri required");
+        // H-7: crossfade_seconds param no longer accepted here — it\'s a Spotify user setting
         await queueTrack(track_uri, accessToken);
-        if (crossfade_seconds) await setCrossfade(crossfade_seconds, accessToken);
-        return new Response(JSON.stringify({ success: true, queued: track_uri }), { headers: CORS_HEADERS });
+        return new Response(JSON.stringify({
+          success: true,
+          queued: track_uri,
+          crossfade_note: CROSSFADE_USER_NOTE,
+        }), { headers: CORS_HEADERS });
       }
+
       case "skip": {
         await skipToNext(accessToken);
         return new Response(JSON.stringify({ success: true }), { headers: CORS_HEADERS });
       }
+
       case "get_playback": {
         const state = await getCurrentPlayback(accessToken);
         return new Response(JSON.stringify({ playback: state }), { headers: CORS_HEADERS });
       }
-      case "status_check": {
-        // C-6: DSP health check — returns error if Spotify not reachable/authed
-        const state = await getCurrentPlayback(accessToken);
-        const connected = state !== null;
-        return new Response(JSON.stringify({ connected, provider: "spotify" }), { headers: CORS_HEADERS });
+
+      case "complete_song_play": {
+        // H-2: write post-play outcome to session_songs so training signals are captured
+        const { session_id, song_id, hr_delta, focus_delta, contributed_to_flow,
+                biometric_state_at_end } = body;
+        if (!session_id || !song_id) throw new Error("session_id and song_id required");
+        await supabase.from("session_songs").update({
+          completed:              true,
+          hr_delta:               hr_delta   ?? null,
+          focus_delta:            focus_delta ?? null,
+          contributed_to_flow:    contributed_to_flow ?? false,
+          biometric_state_at_end: biometric_state_at_end
+            ? JSON.stringify(biometric_state_at_end)
+            : null,
+        }).eq("session_id", session_id).eq("song_id", song_id);
+        return new Response(JSON.stringify({ success: true }), { headers: CORS_HEADERS });
       }
+
+      case "status_check": {
+        // M-5: separate token validity from active playback.
+        // A valid token with no active playback still means DSP is connected.
+        const devices   = await getDevices(accessToken);
+        const hasActive = devices.some((d) => d.is_active);
+        return new Response(JSON.stringify({
+          connected:         true,        // token is valid — we reached this point
+          has_active_device: hasActive,
+          active_device:     devices.find((d) => d.is_active)?.name ?? null,
+          all_devices:       devices.map((d) => ({ name: d.name, is_active: d.is_active })),
+          provider:          "spotify",
+          crossfade_note:    CROSSFADE_USER_NOTE,
+        }), { headers: CORS_HEADERS });
+      }
+
       default:
         return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
           status: 400, headers: CORS_HEADERS,
