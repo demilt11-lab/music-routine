@@ -107,11 +107,17 @@ serve(async (req) => {
 
     // Persist flow event to session log
     if (event && session_id) {
+      // Service-role client bypasses RLS — verify session ownership first
       const { data: session } = await supabase
         .from("listening_sessions")
-        .select("flow_events, flow_entry_time, time_in_flow_minutes")
+        .select("user_id, flow_events, flow_entry_time, time_in_flow_minutes")
         .eq("id", session_id)
         .single();
+      if (!session || session.user_id !== user.id) {
+        return new Response(JSON.stringify({ error: "Session not found" }), {
+          status: 404, headers: CORS,
+        });
+      }
 
       const existingEvents: unknown[] = session?.flow_events ?? [];
       const newEvent = { event, timestamp: new Date().toISOString(),

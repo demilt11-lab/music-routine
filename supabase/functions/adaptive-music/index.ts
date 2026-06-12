@@ -1,9 +1,12 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': Deno.env.get("APP_ORIGIN") ?? '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+import { hrZone, band, dominantEegBand } from "../_shared/privacy.ts";
 
 interface BiometricState {
   heartRate: number;
@@ -40,15 +43,35 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Biometric payloads are health data — require an authenticated user.
+  const supabaseAuth = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+  const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(
+    authHeader.replace("Bearer ", ""),
+  );
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const { 
-      biometricState, 
-      activityType, 
+    const {
+      biometricState,
+      activityType,
       currentSong,
       targetFlowState = "in-flow",
       recentReadings = [],
@@ -62,8 +85,6 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Generating real-time recommendation for ${activityType}, flow state: ${biometricState.flowState}`);
-
     // Analyze biometric trends
     const trend = analyzeTrend(recentReadings);
     
@@ -75,20 +96,15 @@ serve(async (req) => {
 
     // Check if EEG data is available
     const hasEEGData = biometricState.eegAlpha !== undefined;
-    
-    const eegSection = hasEEGData ? `
-## Brainwave Data (EEG):
-- Alpha (8-12 Hz): ${biometricState.eegAlpha?.toFixed(1)} µV - Relaxation, calm focus
-- Beta (12-30 Hz): ${biometricState.eegBeta?.toFixed(1)} µV - Active thinking, concentration
-- Theta (4-8 Hz): ${biometricState.eegTheta?.toFixed(1)} µV - Drowsiness, meditation
-- Gamma (30+ Hz): ${biometricState.eegGamma?.toFixed(1)} µV - Higher cognitive functions
-- Delta (0.5-4 Hz): ${biometricState.eegDelta?.toFixed(1)} µV - Deep sleep
-${biometricState.meditationScore !== undefined ? `- Meditation Score: ${biometricState.meditationScore}%` : ''}
 
-## Brainwave Analysis:
-- Alpha/Beta ratio: ${((biometricState.eegAlpha || 0) / ((biometricState.eegBeta || 0) + 0.001)).toFixed(2)} (higher = more relaxed)
-- Theta/Beta ratio: ${((biometricState.eegTheta || 0) / ((biometricState.eegBeta || 0) + 0.001)).toFixed(2)} (higher = more meditative)
-- Focus indicator: ${biometricState.eegBeta && biometricState.eegTheta ? ((biometricState.eegBeta / (biometricState.eegTheta + biometricState.eegAlpha + 0.001)) > 0.7 ? "High" : "Moderate") : "Unknown"}
+    // Coarse qualitative summary only — raw band powers never leave our infra
+    const alphaBetaRatio = (biometricState.eegAlpha || 0) / ((biometricState.eegBeta || 0) + 0.001);
+    const eegSection = hasEEGData ? `
+## Brainwave Summary (EEG, qualitative):
+- Dominant band: ${dominantEegBand(biometricState)}
+- Alpha/Beta balance: ${alphaBetaRatio > 1 ? "relaxation-leaning" : "active-thinking-leaning"}
+- Focus indicator: ${biometricState.eegBeta && biometricState.eegTheta ? ((biometricState.eegBeta / (biometricState.eegTheta + (biometricState.eegAlpha || 0) + 0.001)) > 0.7 ? "High" : "Moderate") : "Unknown"}
+${biometricState.meditationScore !== undefined ? `- Meditation depth: ${band(biometricState.meditationScore)}` : ''}
 ` : "";
 
     // Build user preference section from feedback data
@@ -105,11 +121,11 @@ IMPORTANT: Strongly factor these preferences into your recommendations. Avoid di
 
     const systemPrompt = `You are an AI music therapist specializing in using music to optimize mental states through physiological entrainment. You analyze real-time biometric data${hasEEGData ? " including brainwave activity" : ""} and recommend specific music adjustments to guide users toward their target mental state.
 
-## Current User State:
-- Heart Rate: ${biometricState.heartRate} BPM
-- Stress Level: ${biometricState.stressLevel}%
-- Focus Score: ${biometricState.focusScore}%
-- Relaxation Score: ${biometricState.relaxationScore}%
+## Current User State (qualitative bands — no raw vitals):
+- Heart Rate Zone: ${hrZone(biometricState.heartRate)}
+- Stress Level: ${band(biometricState.stressLevel)}
+- Focus: ${band(biometricState.focusScore)}
+- Relaxation: ${band(biometricState.relaxationScore)}
 - Current Flow State: ${biometricState.flowState}
 ${eegSection}
 ## Current Song:
@@ -218,8 +234,6 @@ Return your response in this exact JSON format:
     } catch {
       recommendation = generateFallbackRecommendation(biometricState, activityType, targets, adjustment);
     }
-
-    console.log(`Recommendation: ${recommendation.action} - ${recommendation.reasoning}`);
 
     return new Response(JSON.stringify({
       success: true,

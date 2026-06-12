@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CORS = {
   "Access-Control-Allow-Origin":  Deno.env.get("APP_ORIGIN") ?? "*",
-  "Access-Control-Allow-Methods": "GET, DELETE, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Authorization, Content-Type",
 };
 const json = (data: unknown, status = 200) =>
@@ -25,12 +25,22 @@ serve(async (req) => {
   );
   if (authErr || !user) return json({ error: "Unauthorized" }, 401);
 
-  const url    = new URL(req.url);
-  const action = url.searchParams.get("action");
+  // Action comes from the query string (GET/DELETE) or a POST body, so the
+  // frontend can use supabase.functions.invoke (which always POSTs).
+  const url = new URL(req.url);
+  let action = url.searchParams.get("action");
+  if (!action && req.method === "POST") {
+    try {
+      const body = await req.json();
+      action = body?.action ?? null;
+    } catch {
+      action = null;
+    }
+  }
 
   try {
-    // GET ?action=export  — GDPR Article 20
-    if (req.method === "GET" && action === "export") {
+    // GDPR Article 20 — portable data export
+    if (action === "export") {
       const { data, error } = await supabase.rpc("export_user_data", { p_user_id: user.id });
       if (error) throw error;
       return new Response(JSON.stringify(data), {
@@ -42,23 +52,32 @@ serve(async (req) => {
       });
     }
 
-    // DELETE ?action=delete — GDPR Article 17 / CCPA
-    if (req.method === "DELETE" && action === "delete") {
+    // GDPR Article 17 / CCPA — full deletion
+    if (action === "delete") {
       const { data, error } = await supabase.rpc("delete_user_all_data", { p_user_id: user.id });
       if (error) throw error;
 
-      // Delete from auth.users via admin API
-      const adminClient = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-      );
-      await adminClient.auth.admin.deleteUser(user.id);
+      // The RPC catches SQL errors internally and reports them in its result.
+      // Never remove the auth account unless the data wipe actually succeeded,
+      // otherwise health data is orphaned with no owner able to access it.
+      if (!data || data.success !== true) {
+        console.error("[user-data-api] data deletion failed:", data?.error ?? "unknown");
+        return json({
+          error: "Data deletion failed — account NOT removed. Contact support.",
+          detail: data?.error ?? null,
+        }, 500);
+      }
+
+      const { error: adminErr } = await supabase.auth.admin.deleteUser(user.id);
+      if (adminErr) {
+        console.error("[user-data-api] auth deletion failed:", adminErr.message);
+        return json({ ...data, auth_deleted: false, error: "Data wiped but auth account removal failed. Contact support." }, 500);
+      }
 
       return json({ ...data, auth_deleted: true });
     }
 
-    // GET ?action=consent_status
-    if (req.method === "GET" && action === "consent_status") {
+    if (action === "consent_status") {
       const { data: profile } = await supabase
         .from("profiles")
         .select("biometric_consent_granted_at, biometric_consent_version, gdpr_region")

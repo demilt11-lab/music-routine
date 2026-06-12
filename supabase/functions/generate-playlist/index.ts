@@ -1,5 +1,6 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { hrZone, band } from "../_shared/privacy.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -58,8 +59,6 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Generating biometric-enhanced playlist for user ${user.id}, activity: ${activityType}`);
-
     // Fetch user's listening history for this activity
     const { data: sessions } = await supabaseClient
       .from('listening_sessions')
@@ -105,10 +104,11 @@ serve(async (req) => {
       return {
         mood_before: s.mood_before,
         mood_after: s.mood_after,
+        // Qualitative bands only — raw vitals never go to the third-party AI
         biometrics: {
-          avgFocusScore: avgFocus ? Math.round(avgFocus) : null,
-          avgRelaxationScore: avgRelax ? Math.round(avgRelax) : null,
-          avgStressLevel: avgStress ? Math.round(avgStress) : null,
+          focus: band(avgFocus),
+          relaxation: band(avgRelax),
+          stress: band(avgStress),
         },
         songs: s.session_songs?.map((ss: any) => ({
           title: ss.songs?.title,
@@ -125,19 +125,16 @@ serve(async (req) => {
 
 Your task is to analyze the user's listening patterns AND their physiological responses during ${activityType} sessions to generate a perfectly curated playlist.
 
-## User's Biometric Profile for ${activityType}:
-${JSON.stringify(biometricInsight, null, 2)}
-
-## Key Insights from Biometric Data:
+## Key Insights from Biometric Data (qualitative — no raw vitals):
 - Optimal tempo range that produces best focus: ${biometricInsight.optimalTempoRange.min}-${biometricInsight.optimalTempoRange.max} BPM
 - Optimal energy level: ${Math.round(biometricInsight.optimalEnergyRange.min * 100)}-${Math.round(biometricInsight.optimalEnergyRange.max * 100)}%
-- Average focus score achieved: ${biometricInsight.avgFocusScore}%
-- Average relaxation score: ${biometricInsight.avgRelaxationScore}%
-- Flow state achievement rate: ${biometricInsight.flowStatePercentage}%
-- Average heart rate during sessions: ${biometricInsight.avgHeartRate} BPM
+- Typical focus achieved: ${band(biometricInsight.avgFocusScore)}
+- Typical relaxation: ${band(biometricInsight.avgRelaxationScore)}
+- Flow state achievement: ${band(biometricInsight.flowStatePercentage)}
+- Typical heart rate zone during sessions: ${hrZone(biometricInsight.avgHeartRate)}
 
 ## Best Performing Songs (highest focus/relaxation based on biometrics):
-${biometricInsight.bestPerformingSongs.map(s => `- "${s.title}" by ${s.artist} (${s.tempo} BPM, ${Math.round(s.energy * 100)}% energy, ${s.focusScore}% focus)`).join('\n')}
+${biometricInsight.bestPerformingSongs.map(s => `- "${s.title}" by ${s.artist} (${s.tempo} BPM, ${Math.round(s.energy * 100)}% energy, ${band(s.focusScore)} focus)`).join('\n')}
 
 ## Past Listening Sessions with Biometric Data:
 ${JSON.stringify(listeningContext.slice(0, 5), null, 2)}

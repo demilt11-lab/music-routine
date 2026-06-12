@@ -2,11 +2,12 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   classifyBiometricState,
+  resolveActivityProfile,
   validateBPMTransition,
   passesSpeechinessFilter,
   type BiometricWindow,
   type StateClass,
-} from "../state-classifier/index.ts";
+} from "../_shared/classifier.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin":  Deno.env.get("APP_ORIGIN") ?? "*",
@@ -25,7 +26,7 @@ function getTargetFeatureRanges(
     return { bpm_min: 120, bpm_max: 160, energy_min: 0.7, energy_max: 1.0 };
   }
   if (direction === "DOWN") {
-    if (["yoga", "meditation", "recovery"].includes(activityType))
+    if (["yoga", "meditation", "recovery", "sleep"].includes(activityType))
       return { bpm_min: 50, bpm_max: 80, energy_min: 0.1, energy_max: 0.4 };
     if (activityType === "study") return { bpm_min: 60, bpm_max: 80, energy_min: 0.2, energy_max: 0.5 };
     return { bpm_min: 70, bpm_max: 100, energy_min: 0.3, energy_max: 0.6 };
@@ -79,33 +80,39 @@ serve(async (req) => {
       urgency: "LOW" | "MEDIUM" | "HIGH";
     } = body;
 
-    // 1. Classify state
-    const ACTIVITY_PROFILES: Record<string, Parameters<typeof classifyBiometricState>[1]> = {
-      strength_training: { activity_type: "strength_training", hr_min_pct: 0.70, hr_max_pct: 0.90, hr_optimal_min_pct: 0.75, hr_optimal_max_pct: 0.82, hrv_target: "moderate", eeg_target: "beta", focus_threshold: null, stress_max: 60 },
-      cardio:    { activity_type: "cardio",    hr_min_pct: 0.65, hr_max_pct: 0.88, hr_optimal_min_pct: 0.65, hr_optimal_max_pct: 0.80, hrv_target: "moderate", eeg_target: null, focus_threshold: null, stress_max: 70 },
-      yoga:      { activity_type: "yoga",      hr_min_pct: 0.50, hr_max_pct: 0.65, hr_optimal_min_pct: 0.50, hr_optimal_max_pct: 0.65, hrv_target: "high", eeg_target: "alpha", focus_threshold: null, stress_max: 40 },
-      study:     { activity_type: "study",     hr_min_pct: 0, hr_max_pct: 1, hr_optimal_min_pct: 0, hr_optimal_max_pct: 1, hrv_target: "high", eeg_target: "alpha", focus_threshold: 60, stress_max: 35 },
-      meditation:{ activity_type: "meditation",hr_min_pct: 0, hr_max_pct: 1, hr_optimal_min_pct: 0, hr_optimal_max_pct: 1, hrv_target: "high", eeg_target: "alpha_theta", focus_threshold: null, stress_max: 20 },
-      creative_work: { activity_type: "creative_work", hr_min_pct: 0, hr_max_pct: 1, hr_optimal_min_pct: 0, hr_optimal_max_pct: 1, hrv_target: "high", eeg_target: "alpha_theta", focus_threshold: 50, stress_max: 40 },
-      recovery:  { activity_type: "recovery",  hr_min_pct: 0, hr_max_pct: 0.65, hr_optimal_min_pct: 0, hr_optimal_max_pct: 0.60, hrv_target: "high", eeg_target: null, focus_threshold: null, stress_max: 30 },
-    };
-    const profile = ACTIVITY_PROFILES[activity_type] ?? ACTIVITY_PROFILES["study"];
+    // The service-role client bypasses RLS — verify the session belongs to
+    // the caller before reading state for it or writing play logs to it.
+    if (session_id) {
+      const { data: session } = await supabase
+        .from("listening_sessions")
+        .select("id, user_id")
+        .eq("id", session_id)
+        .single();
+      if (!session || session.user_id !== user.id) {
+        return new Response(JSON.stringify({ error: "Session not found" }), {
+          status: 404, headers: CORS_HEADERS,
+        });
+      }
+    }
+
+    // 1. Classify state (shared profiles — single source of truth)
+    const profile        = resolveActivityProfile(activity_type);
     const classification = classifyBiometricState(biometric_window, profile);
     const direction      = stateToDirection(classification.state);
-    const ranges         = getTargetFeatureRanges(direction, activity_type);
+    const ranges         = getTargetFeatureRanges(direction, profile.activity_type);
 
-    // 2. Query candidate songs
+    // 2. Query candidate songs (schema columns: tempo = BPM, energy = 0-1)
     let query = supabase
       .from("songs")
-      .select("id, title, artist, bpm, energy_level, valence, speechiness, spotify_track_id, apple_music_id, avg_hr_delta_60s, avg_stress_delta_60s, avg_focus_delta_60s")
-      .gte("bpm", ranges.bpm_min)
-      .lte("bpm", ranges.bpm_max)
-      .gte("energy_level", ranges.energy_min)
-      .lte("energy_level", ranges.energy_max)
+      .select("id, title, artist, tempo, energy, valence, speechiness, spotify_track_id, spotify_id, apple_music_id, avg_hr_delta_60s, avg_stress_delta_60s, avg_focus_delta_60s")
+      .gte("tempo", ranges.bpm_min)
+      .lte("tempo", ranges.bpm_max)
+      .gte("energy", ranges.energy_min)
+      .lte("energy", ranges.energy_max)
       .limit(80);
 
-    // C-17: Speechiness filter — CRITICAL for study/meditation
-    if (["study", "meditation", "sleep"].includes(activity_type) && !user_override_speechiness) {
+    // C-17: Speechiness filter — CRITICAL for study/meditation/sleep
+    if (["study", "meditation", "sleep"].includes(profile.activity_type) && !user_override_speechiness) {
       query = query.lte("speechiness", 0.3);
     }
 
@@ -127,9 +134,9 @@ serve(async (req) => {
 
     // 4. Score candidates (simple population model — personalized model blended later)
     type SongCandidate = {
-      id: string; title: string; artist: string; bpm: number;
-      energy_level: number; valence: number; speechiness: number | null;
-      spotify_track_id: string | null; apple_music_id: string | null;
+      id: string; title: string; artist: string; tempo: number | null;
+      energy: number | null; valence: number | null; speechiness: number | null;
+      spotify_track_id: string | null; spotify_id: string | null; apple_music_id: string | null;
       avg_hr_delta_60s: number | null; avg_stress_delta_60s: number | null;
       avg_focus_delta_60s: number | null;
     };
@@ -148,13 +155,14 @@ serve(async (req) => {
       }
 
       // C-16: BPM transition penalty — soft score reduction for large jumps
-      const bpmDelta = Math.abs((song.bpm ?? 120) - current_bpm);
-      const bpmValid = validateBPMTransition(current_bpm, song.bpm ?? 120, urgency);
+      const songBpm  = song.tempo ?? 120;
+      const bpmDelta = Math.abs(songBpm - current_bpm);
+      const bpmValid = validateBPMTransition(current_bpm, songBpm, urgency);
       if (!bpmValid.allowed) return null; // hard filter
       score -= bpmDelta * 0.5; // penalize large jumps even within limit
 
       // C-17: speechiness compliance check (secondary guard)
-      if (!passesSpeechinessFilter(song.speechiness, activity_type, user_override_speechiness)) {
+      if (!passesSpeechinessFilter(song.speechiness, profile.activity_type, user_override_speechiness)) {
         return null;
       }
 

@@ -166,6 +166,17 @@ serve(async (req) => {
         const { session_id, song_id, hr_delta, focus_delta, contributed_to_flow,
                 biometric_state_at_end } = body;
         if (!session_id || !song_id) throw new Error("session_id and song_id required");
+        // Service-role client bypasses RLS — verify session ownership first
+        const { data: ownedSession } = await supabase
+          .from("listening_sessions")
+          .select("id, user_id")
+          .eq("id", session_id)
+          .single();
+        if (!ownedSession || ownedSession.user_id !== user.id) {
+          return new Response(JSON.stringify({ error: "Session not found" }), {
+            status: 404, headers: CORS_HEADERS,
+          });
+        }
         await supabase.from("session_songs").update({
           completed:              true,
           hr_delta:               hr_delta   ?? null,

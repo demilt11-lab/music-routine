@@ -46,7 +46,11 @@ serve(async (req) => {
     const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
 
     // Flow score computation (spec: flow_minutes / total_minutes * 100, weighted by depth)
-    const totalMinutes = session.duration_minutes ?? 0;
+    // duration_minutes is derived from timestamps — sessions don't set it directly
+    const computedDuration = session.ended_at && session.started_at
+      ? (new Date(session.ended_at).getTime() - new Date(session.started_at).getTime()) / 60000
+      : 0;
+    const totalMinutes = session.duration_minutes ?? computedDuration;
     const flowMinutes  = session.time_in_flow_minutes ?? 0;
     const flowScore    = totalMinutes > 0 ? Math.min(100, Math.round((flowMinutes / totalMinutes) * 100)) : 0;
 
@@ -89,9 +93,10 @@ serve(async (req) => {
 
     // Persist report + update session averages
     await supabase.from("listening_sessions").update({
-      flow_score,
-      avg_heart_rate: avg(hrs),
-      avg_hrv:        avg(hrvs),
+      flow_score:       flowScore,
+      duration_minutes: totalMinutes,
+      avg_heart_rate:   avg(hrs),
+      avg_hrv:          avg(hrvs),
       post_session_report: report,
     }).eq("id", session_id);
 

@@ -5,7 +5,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const JAMENDO_CLIENT_ID = "b6747d04";
+// Public API client identifier — overridable via env per key-management policy
+const JAMENDO_CLIENT_ID = Deno.env.get("JAMENDO_CLIENT_ID") ?? "b6747d04";
 const JAMENDO_BASE = "https://api.jamendo.com/v3.0";
 
 serve(async (req) => {
