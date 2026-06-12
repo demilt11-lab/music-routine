@@ -104,9 +104,9 @@ INSERT INTO public.listening_sessions (id, user_id, activity_type_id, started_at
 SELECT '00000000-0000-0000-0000-000000000051'::uuid, '00000000-0000-0000-0000-00000000000a', id,
        NOW() - INTERVAL '30 min', NOW()
 FROM public.activity_types WHERE name = 'study' LIMIT 1;
-INSERT INTO public.songs (id, user_id, title, artist, tempo, energy, speechiness)
+INSERT INTO public.songs (id, user_id, title, artist, tempo, energy, speechiness, spotify_track_id)
 VALUES ('00000000-0000-0000-0000-0000000000d1'::uuid, '00000000-0000-0000-0000-00000000000a',
-        'Test Track', 'Test Artist', 120, 0.5, 0.1);
+        'Test Track', 'Test Artist', 120, 0.5, 0.1, 'sptest1');
 INSERT INTO public.session_songs (session_id, song_id, played_at, selection_reason, queued_at_state, biometric_state_at_start)
 VALUES ('00000000-0000-0000-0000-000000000051'::uuid, '00000000-0000-0000-0000-0000000000d1'::uuid,
         NOW(), 'state=OPTIMAL direction=MAINTAIN', 'OPTIMAL', '{"hr_mean": 70}');
@@ -134,6 +134,30 @@ BEGIN
   END IF;
 END $$;
 \echo T10b PASS: learning loop rolls play deltas into song response profile
+
+-- T10c: population aggregate refreshed for the track (anonymized)
+DO $$
+DECLARE v_hr DOUBLE PRECISION; v_n INTEGER;
+BEGIN
+  SELECT avg_hr_delta_60s, sample_count INTO v_hr, v_n
+  FROM public.population_song_response WHERE spotify_track_id = 'sptest1';
+  IF v_hr IS DISTINCT FROM -2.5 OR v_n < 1 THEN
+    RAISE EXCEPTION 'population aggregate wrong: hr=% n=%', v_hr, v_n;
+  END IF;
+END $$;
+\echo T10c PASS: population response aggregate refreshed
+
+-- T10d: readiness uses recent flow momentum (flow 74 → 50 + 7.2, MEDIUM)
+DO $$
+DECLARE v jsonb;
+BEGIN
+  v := public.compute_readiness('00000000-0000-0000-0000-00000000000a'::uuid);
+  IF (v->>'readiness_score')::numeric NOT BETWEEN 45 AND 70
+     OR v->>'predicted_flow_potential' <> 'MEDIUM' THEN
+    RAISE EXCEPTION 'unexpected readiness: %', v;
+  END IF;
+END $$;
+\echo T10d PASS: readiness score computed from session history
 
 -- T11: vault key storage records a reference row
 SELECT public.store_user_key_in_vault('00000000-0000-0000-0000-00000000000a'::uuid, 'dGVzdC1rZXk=');

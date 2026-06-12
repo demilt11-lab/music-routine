@@ -8,6 +8,11 @@ import {
   type BiometricWindow,
   type StateClass,
 } from "../_shared/classifier.ts";
+import {
+  blendProfiles,
+  pickTransitionSequence,
+  type ResponseProfile,
+} from "../_shared/selection.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin":  Deno.env.get("APP_ORIGIN") ?? "*",
@@ -124,6 +129,34 @@ serve(async (req) => {
       (s: { id: string }) => !played_this_session.includes(s.id),
     );
 
+    // 3b. Personal/population blend inputs (spec Module 7): the user's
+    // session count sets the personal-model weight; population aggregates
+    // are keyed by spotify_track_id.
+    const { data: baseline } = await supabase
+      .from("user_biometric_baseline")
+      .select("session_count")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const sessionCount = baseline?.session_count ?? 0;
+
+    const trackIds = filtered
+      .map((s: { spotify_track_id: string | null }) => s.spotify_track_id)
+      .filter((t: string | null): t is string => t !== null);
+    const populationByTrack = new Map<string, ResponseProfile>();
+    if (trackIds.length > 0) {
+      const { data: popRows } = await supabase
+        .from("population_song_response")
+        .select("spotify_track_id, avg_hr_delta_60s, avg_focus_delta_60s, avg_stress_delta_60s")
+        .in("spotify_track_id", trackIds);
+      for (const row of popRows ?? []) {
+        populationByTrack.set(row.spotify_track_id, {
+          avg_hr_delta_60s: row.avg_hr_delta_60s,
+          avg_focus_delta_60s: row.avg_focus_delta_60s,
+          avg_stress_delta_60s: row.avg_stress_delta_60s,
+        });
+      }
+    }
+
     if (filtered.length === 0) {
       return new Response(JSON.stringify({
         state: classification,
@@ -143,15 +176,26 @@ serve(async (req) => {
     const scored = filtered.map((song: SongCandidate) => {
       let score = 0;
 
-      // Physio response score
+      // Physio response score — personal profile blended with the
+      // anonymized population profile (weight grows with session count,
+      // capped 0.85 personal / floor 0.15 population)
+      const blended = blendProfiles(
+        {
+          avg_hr_delta_60s: song.avg_hr_delta_60s,
+          avg_focus_delta_60s: song.avg_focus_delta_60s,
+          avg_stress_delta_60s: song.avg_stress_delta_60s,
+        },
+        song.spotify_track_id ? populationByTrack.get(song.spotify_track_id) ?? null : null,
+        sessionCount,
+      );
       if (direction === "UP") {
         // Want HR increase, focus increase
-        if (song.avg_hr_delta_60s  !== null) score += song.avg_hr_delta_60s  * 2;
-        if (song.avg_focus_delta_60s !== null) score += song.avg_focus_delta_60s;
+        if (blended.avg_hr_delta_60s  !== null) score += blended.avg_hr_delta_60s  * 2;
+        if (blended.avg_focus_delta_60s !== null) score += blended.avg_focus_delta_60s;
       } else if (direction === "DOWN") {
         // Want HR decrease, stress decrease
-        if (song.avg_hr_delta_60s    !== null) score -= song.avg_hr_delta_60s * 2;
-        if (song.avg_stress_delta_60s !== null) score -= song.avg_stress_delta_60s;
+        if (blended.avg_hr_delta_60s    !== null) score -= blended.avg_hr_delta_60s * 2;
+        if (blended.avg_stress_delta_60s !== null) score -= blended.avg_stress_delta_60s;
       }
 
       // C-16: BPM transition penalty — soft score reduction for large jumps
@@ -179,6 +223,22 @@ serve(async (req) => {
 
     const selected = scored[0];
 
+    // 4b. Progressive transition sequence (spec Module 4): for gradual
+    // transitions, 2 follow-up songs stepping ≤15 BPM per hop toward the
+    // target. Urgent transitions get a single immediate track instead.
+    let transitionSequence: typeof scored = [];
+    if (direction !== "MAINTAIN" && urgency !== "HIGH" && selected!.tempo !== null) {
+      const followUps = pickTransitionSequence(
+        scored.slice(1).map((s) => ({ id: s!.id, tempo: s!.tempo, score: s!.score })),
+        selected!.tempo,
+        ranges.bpm_min,
+        ranges.bpm_max,
+        { maxStepBpm: 15, length: 2 },
+      );
+      const byId = new Map(scored.map((s) => [s!.id, s]));
+      transitionSequence = followUps.map((f) => byId.get(f.id)!).filter(Boolean);
+    }
+
     // 5. Log selection as training signal
     if (session_id) {
       await supabase.from("session_songs").insert({
@@ -195,6 +255,9 @@ serve(async (req) => {
       state:         classification,
       direction,
       selected_song: selected,
+      // Lookahead for the client to queue; outcomes are recorded when these
+      // actually become the playing track.
+      transition_sequence: transitionSequence,
       reason:        `State: ${classification.state} → ${direction}. Confidence: ${(classification.confidence * 100).toFixed(0)}%`,
     }), { headers: CORS_HEADERS });
 
