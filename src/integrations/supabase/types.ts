@@ -168,38 +168,83 @@ export type Database = {
       listening_sessions: {
         Row: {
           activity_type_id: string
+          avg_heart_rate: number | null
+          avg_hrv: number | null
+          biometric_device_id: string | null
           created_at: string
+          dsp_provider: string | null
+          duration_minutes: number | null
           ended_at: string | null
+          flow_entry_time: string | null
+          flow_events: Json | null
+          flow_score: number | null
           id: string
           mood_after: string | null
           mood_before: string | null
           name: string | null
           notes: string | null
+          peak_flow_duration_minutes: number | null
+          post_session_report: Json | null
+          predicted_flow_potential: string | null
+          readiness_score: number | null
           started_at: string
+          state_log: Json | null
+          time_in_flow_minutes: number | null
+          trigger_log: Json | null
           user_id: string
         }
         Insert: {
           activity_type_id: string
+          avg_heart_rate?: number | null
+          avg_hrv?: number | null
+          biometric_device_id?: string | null
           created_at?: string
+          dsp_provider?: string | null
+          duration_minutes?: number | null
           ended_at?: string | null
+          flow_entry_time?: string | null
+          flow_events?: Json | null
+          flow_score?: number | null
           id?: string
           mood_after?: string | null
           mood_before?: string | null
           name?: string | null
           notes?: string | null
+          peak_flow_duration_minutes?: number | null
+          post_session_report?: Json | null
+          predicted_flow_potential?: string | null
+          readiness_score?: number | null
           started_at?: string
+          state_log?: Json | null
+          time_in_flow_minutes?: number | null
+          trigger_log?: Json | null
           user_id: string
         }
         Update: {
           activity_type_id?: string
+          avg_heart_rate?: number | null
+          avg_hrv?: number | null
+          biometric_device_id?: string | null
           created_at?: string
+          dsp_provider?: string | null
+          duration_minutes?: number | null
           ended_at?: string | null
+          flow_entry_time?: string | null
+          flow_events?: Json | null
+          flow_score?: number | null
           id?: string
           mood_after?: string | null
           mood_before?: string | null
           name?: string | null
           notes?: string | null
+          peak_flow_duration_minutes?: number | null
+          post_session_report?: Json | null
+          predicted_flow_potential?: string | null
+          readiness_score?: number | null
           started_at?: string
+          state_log?: Json | null
+          time_in_flow_minutes?: number | null
+          trigger_log?: Json | null
           user_id?: string
         }
         Relationships: [

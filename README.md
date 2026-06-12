@@ -102,9 +102,36 @@ Set these in the [Supabase dashboard](https://supabase.com/dashboard) → Edge F
 
 ## Database Migrations
 
-All migrations are in `supabase/migrations/`. Apply in chronological order. The latest migration (`20260610120000_investor_demo_hardening.sql`) is required for production.
+All migrations are in `supabase/migrations/`. Apply in chronological order; the `20260611_*` compliance and audit-remediation migrations are required for production.
+
+Validate that every migration applies from scratch and that the health-data compliance pipeline (consent gating, cross-user authorization, GDPR export/delete, retention purge, learning loop) behaves correctly — without Docker or a Supabase project — by running:
+
+```bash
+./scripts/validate-migrations.sh   # needs local Postgres binaries; run as a non-root user
+```
 
 To run a scheduled cleanup of orphaned sessions, wire up the `cleanup_orphan_sessions()` function using Supabase's pg_cron scheduler (see `supabase/migrations/20260611_cron_setup.sql`).
+
+## Reactive Engine
+
+The live session loop is deterministic and runs the same biometric state
+classifier on the client and the server (one source of truth in
+`supabase/functions/_shared/classifier.ts`, re-exported to the web app via
+`src/lib/classifier.ts`):
+
+1. `useReactiveEngine` classifies a rolling 30s biometric window every 5s.
+2. A duration-gated trigger (`TriggerGate`) calls the `playlist-engine` edge
+   function only when a non-optimal state persists, which selects the next
+   track under BPM-transition and speechiness constraints.
+3. `flow-state-detector` tracks flow entry/sustain/disruption.
+4. Every engine-selected play is closed out via `dsp-connector`
+   `complete_song_play`, capturing the song→physiology training signal.
+5. On session end, `session-post-processor` builds the report, updates the
+   user's baseline, and `aggregate_session_learning` rolls play deltas into
+   each song's response profile — closing the personalization loop.
+
+The legacy LLM recommendation path (`adaptive-music`) remains as a parallel
+suggestion source; raw vitals are never sent to it (only qualitative bands).
 
 ---
 

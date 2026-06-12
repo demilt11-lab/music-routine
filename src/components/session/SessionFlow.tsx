@@ -28,6 +28,7 @@ import { ActivityStartingRecommendation } from "./ActivityStartingRecommendation
 import { LiveAdaptationFeed, type AdaptationEvent } from "./LiveAdaptationFeed";
 import { BiometricMusicMapper } from "./BiometricMusicMapper";
 import { BiometricConsentModal } from "@/components/BiometricConsentModal";
+import { useReactiveEngine, type EngineSelectedSong } from "@/hooks/useReactiveEngine";
 import { useActivityStartingSong } from "@/hooks/useActivityStartingSong";
 import { MusicPlayer } from "@/components/music/MusicPlayer";
 import { EEGReading } from "@/hooks/useMuseEEG";
@@ -191,6 +192,77 @@ const syncSessionBuffersToState = useCallback(() => {
       timestamp: new Date(),
     }, ...prev].slice(0, 100));
   }, []);
+
+  // Route an engine-selected song into actual playback. The deterministic
+  // engine has already enforced state, BPM-transition and speechiness
+  // constraints server-side; here we just play it (Spotify, Jamendo fallback).
+  const handleEngineTrack = useCallback((song: EngineSelectedSong, reason: string) => {
+    addAdaptationEvent({
+      type: "track_change",
+      title: `Engine: ${song.title}`,
+      description: `${song.artist} — ${reason}`,
+      details: {
+        source: "FlowState Engine",
+        trackTitle: song.title,
+        trackArtist: song.artist,
+        targetTempo: song.tempo ?? undefined,
+      },
+    });
+
+    const spotifyUri = song.spotify_track_id
+      ? `spotify:track:${song.spotify_track_id}`
+      : song.spotify_id
+        ? `spotify:track:${song.spotify_id}`
+        : null;
+
+    if (spotifyUri) {
+      window.dispatchEvent(new CustomEvent("adaptive-spotify-play", {
+        detail: { uri: spotifyUri, name: song.title, artist: song.artist },
+      }));
+    } else {
+      // No Spotify id — let Jamendo find the closest match by tempo/energy
+      void jamendo.searchByTempoEnergy(song.tempo ?? 110, song.energy ?? 0.5, selectedActivity?.name)
+        .then((tracks: JamendoTrack[]) => {
+          if (tracks.length > 0) jamendo.play(tracks[0]);
+        });
+    }
+  }, [addAdaptationEvent, jamendo, selectedActivity?.name]);
+
+  const reactiveEngine = useReactiveEngine({
+    sessionId,
+    activityName: selectedActivity?.name ?? null,
+    enabled: step === "active",
+    onTrackSelected: handleEngineTrack,
+    onFlowEvent: (event, durationS) => {
+      if (event === "FLOW_ENTERED") {
+        addAdaptationEvent({
+          type: "flow_shift",
+          title: "Flow state reached 🎯",
+          description: "Music shifting to maintenance — preserving your flow.",
+          details: {},
+        });
+      } else if (event === "FLOW_SUSTAINED_30MIN") {
+        flowNotificationsRef.current.notifySessionMilestone(
+          "30 Minutes in Flow 🏆",
+          "Logged as a gold-standard session for your personal model.",
+        );
+        addAdaptationEvent({
+          type: "flow_shift",
+          title: "30 minutes in flow 🏆",
+          description: "Logged as a gold-standard session for your model.",
+          details: {},
+        });
+      } else if (event === "FLOW_DISRUPTED") {
+        addAdaptationEvent({
+          type: "flow_shift",
+          title: "Flow disrupted",
+          description: `After ${Math.round(durationS / 60)} min — re-entering active mode.`,
+          details: {},
+        });
+      }
+    },
+  });
+  const { pushReading: enginePushReading } = reactiveEngine;
 
   // Fetch activity types
   useEffect(() => {
@@ -371,11 +443,27 @@ const syncSessionBuffersToState = useCallback(() => {
   useEffect(() => {
     if (biometricState.isTracking && biometricState.currentReading) {
       const currentReading = biometricState.currentReading;
-      
+
+      // Feed the deterministic reactive engine its own reading buffer.
+      // pushReading is a stable useCallback, so this won't re-run per render.
+      enginePushReading({
+        heartRate: currentReading.heartRate,
+        heartRateVariability: currentReading.heartRateVariability,
+        stressLevel: currentReading.stressLevel,
+        relaxationScore: eegMetrics?.relaxation ?? currentReading.relaxationScore,
+        focusScore: eegMetrics?.focus ?? currentReading.focusScore,
+        eegAlpha: currentReading.eegAlpha,
+        eegBeta: currentReading.eegBeta,
+        eegTheta: currentReading.eegTheta,
+        eegGamma: currentReading.eegGamma,
+        eegDelta: currentReading.eegDelta,
+        recordedAt: currentReading.recordedAt,
+      });
+
       // If EEG is connected, use EEG-derived focus and relaxation scores
       const focusScore = eegMetrics?.focus ?? currentReading.focusScore ?? 50;
       const relaxationScore = eegMetrics?.relaxation ?? currentReading.relaxationScore ?? 50;
-      
+
       adaptiveMusic.updateBiometrics({
         heartRate: currentReading.heartRate || 70,
         stressLevel: currentReading.stressLevel || 30,
@@ -391,7 +479,7 @@ const syncSessionBuffersToState = useCallback(() => {
         meditationScore: eegMetrics?.meditation,
       });
     }
-  }, [biometricState.currentReading, biometricState.flowState, biometricState.isTracking, adaptiveMusic, eegMetrics]);
+  }, [biometricState.currentReading, biometricState.flowState, biometricState.isTracking, adaptiveMusic, eegMetrics, enginePushReading]);
 
   // Sync user preferences into adaptive music engine
   useEffect(() => {
@@ -636,10 +724,20 @@ const syncSessionBuffersToState = useCallback(() => {
 
       if (updateError) throw updateError;
 
-      // Save biometric readings
+      // Close out the engine's in-flight track and persist state/trigger logs
+      await reactiveEngine.finishSession();
+
+      // Save biometric readings (post-processor reads them back from the DB)
       if (biometricState.readings.length > 0) {
         await saveReadingsToSession(sessionId);
       }
+
+      // Generate the post-session report, update baselines, and roll this
+      // session's plays into each song's learned response profile.
+      const { error: postErr } = await supabase.functions.invoke("session-post-processor", {
+        body: { session_id: sessionId },
+      });
+      if (postErr) console.error("Post-session processing failed:", postErr);
 
       setStep("complete");
       toast.success("Session saved successfully!");
@@ -1011,6 +1109,8 @@ const syncSessionBuffersToState = useCallback(() => {
                 queue={autoPlayQueue.state.queue}
                 currentQueueTrack={autoPlayQueue.getCurrentTrack()}
                 onSkipNext={() => {
+                  // A user skip is a training signal (negative if <15s in)
+                  reactiveEngine.notifyManualSkip();
                   const nextTrack = autoPlayQueue.skipToNext();
                   if (nextTrack && nextTrack.audioUrl) {
                     const jamendoTrack = jamendo.tracks.find(t => t.audio === nextTrack.audioUrl);
