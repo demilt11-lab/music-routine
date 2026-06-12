@@ -26,7 +26,7 @@ ALTER TABLE public.biometric_readings
   ADD COLUMN IF NOT EXISTS current_track_bpm        INTEGER,
   ADD COLUMN IF NOT EXISTS current_track_energy     DOUBLE PRECISION,
   ADD COLUMN IF NOT EXISTS current_track_elapsed_s  INTEGER,
-  ADD COLUMN IF NOT EXISTS signal_quality           TEXT DEFAULT 'good',
+  -- signal_quality already exists as INTEGER 0-100 (20260610 hardening migration)
   ADD COLUMN IF NOT EXISTS data_gap                 BOOLEAN DEFAULT FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_biometric_brin_time
@@ -69,7 +69,8 @@ ALTER TABLE public.songs
   ADD COLUMN IF NOT EXISTS state_transition_rate DOUBLE PRECISION;
 
 CREATE INDEX IF NOT EXISTS idx_songs_speechiness ON public.songs (speechiness);
-CREATE INDEX IF NOT EXISTS idx_songs_energy_bpm  ON public.songs (energy_level, bpm);
+-- Canonical audio-feature columns are `energy` (0-1) and `tempo` (BPM)
+CREATE INDEX IF NOT EXISTS idx_songs_energy_tempo ON public.songs (energy, tempo);
 CREATE INDEX IF NOT EXISTS idx_songs_spotify_id  ON public.songs (spotify_track_id);
 
 -- ── user_biometric_baseline (H-4) ────────────────────────────
