@@ -1,4 +1,3 @@
-/// <reference path="../types/web-bluetooth.d.ts" />
 import { useState, useCallback, useRef, useEffect } from "react";
 
 export interface EEGReading {
@@ -320,7 +319,7 @@ export function useMuseEEG(): UseMuseEEGReturn {
     characteristicsRef.current.forEach(char => {
       try {
         char.stopNotifications();
-      } catch (e) {}
+      } catch { /* already stopped */ }
     });
     characteristicsRef.current = [];
 

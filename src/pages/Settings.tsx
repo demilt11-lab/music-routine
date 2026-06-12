@@ -14,15 +14,29 @@ import {
   ArrowLeft,
   Bell,
   ChevronRight,
+  Download,
   Loader2,
   Moon,
   Music,
   Palette,
   Save,
+  ShieldOff,
   Sun,
   ThumbsUp,
+  Trash2,
   User,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useAuthReady } from "@/hooks/useAuthReady";
 import { DashboardSkeleton } from "@/components/skeletons/DashboardSkeleton";
 
@@ -94,6 +108,125 @@ const notificationRows = [
     description: "Receive a weekly email with your session stats",
   },
 ];
+
+const DataPrivacyCard = memo(function DataPrivacyCard({ userId }: { userId: string | undefined }) {
+  const navigate = useNavigate();
+  const [isExporting, setIsExporting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isRevoking, setIsRevoking] = useState(false);
+
+  const handleExport = useCallback(async () => {
+    setIsExporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("user-data-api", {
+        body: { action: "export" },
+      });
+      if (error) throw error;
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `flowstate-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Your data export has been downloaded.");
+    } catch (err) {
+      console.error("Data export failed:", err);
+      toast.error("Export failed. Please try again or contact support.");
+    } finally {
+      setIsExporting(false);
+    }
+  }, []);
+
+  const handleRevokeConsent = useCallback(async () => {
+    if (!userId) return;
+    setIsRevoking(true);
+    try {
+      const { error } = await supabase.rpc("revoke_biometric_consent", { p_user_id: userId });
+      if (error) throw error;
+      toast.success("Biometric consent withdrawn. Tracking is disabled until you consent again.");
+    } catch (err) {
+      console.error("Consent revocation failed:", err);
+      toast.error("Could not withdraw consent. Please try again.");
+    } finally {
+      setIsRevoking(false);
+    }
+  }, [userId]);
+
+  const handleDeleteAccount = useCallback(async () => {
+    setIsDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("user-data-api", {
+        body: { action: "delete" },
+      });
+      if (error) throw error;
+      if (!data || data.success !== true) {
+        throw new Error(data?.error ?? "Deletion did not complete");
+      }
+      toast.success("Your account and all data have been deleted.");
+      await supabase.auth.signOut();
+      navigate("/");
+    } catch (err) {
+      console.error("Account deletion failed:", err);
+      toast.error("Deletion failed — your account was NOT removed. Please contact support.");
+      setIsDeleting(false);
+    }
+  }, [navigate]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Download className="h-5 w-5 text-primary" />
+          Data &amp; Privacy
+        </CardTitle>
+        <CardDescription>
+          Export or permanently delete your health data (GDPR / CCPA)
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <Button variant="outline" className="w-full justify-start" onClick={handleExport} disabled={isExporting}>
+          {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+          Export all my data (JSON)
+        </Button>
+
+        <Button variant="outline" className="w-full justify-start" onClick={handleRevokeConsent} disabled={isRevoking || !userId}>
+          {isRevoking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldOff className="mr-2 h-4 w-4" />}
+          Withdraw biometric consent
+        </Button>
+
+        <Separator />
+
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" className="w-full justify-start" disabled={isDeleting}>
+              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              Delete my account and all data
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Permanently delete everything?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This erases all your sessions, biometric readings, music history,
+                preferences and your account itself. This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={handleDeleteAccount}
+              >
+                Yes, delete everything
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </CardContent>
+    </Card>
+  );
+});
 
 const SettingsHeader = memo(function SettingsHeader({
   onBack,
@@ -521,6 +654,8 @@ const Settings = () => {
         </Card>
 
         <FeedbackNavigationCard onNavigate={handleFeedbackNavigate} />
+
+        <DataPrivacyCard userId={user?.id} />
 
         <Button
           className="w-full"

@@ -343,7 +343,7 @@ const RecentPlaylistsSection = memo(function RecentPlaylistsSection({
           <EmptyState
             icon={ListMusic}
             title="No AI playlists yet"
-            description="Hit \"AI Playlist\" on any activity above to generate a personalized playlist."
+            description='Hit "AI Playlist" on any activity above to generate a personalized playlist.'
             actionLabel="Scroll to Activities"
             onAction={handleScrollToTop}
           />

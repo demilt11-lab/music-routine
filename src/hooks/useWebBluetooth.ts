@@ -1,4 +1,3 @@
-/// <reference path="../types/web-bluetooth.d.ts" />
 import { useState, useCallback, useRef, useEffect } from "react";
 
 export interface BluetoothDevice {
@@ -128,7 +127,7 @@ export function useWebBluetooth(): UseWebBluetoothReturn {
       bt.addEventListener("availabilitychanged", handler);
     } catch { /* not supported in all browsers */ }
     return () => {
-      try { bt.removeEventListener("availabilitychanged", handler); } catch {}
+      try { bt.removeEventListener("availabilitychanged", handler); } catch { /* listener never attached */ }
     };
   }, []);
 

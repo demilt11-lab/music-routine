@@ -102,7 +102,7 @@ export function useAppleWatchBluetooth(): UseAppleWatchBluetoothReturn {
   const disconnect = useCallback(() => {
     if (charRef.current) {
       charRef.current.removeEventListener("characteristicvaluechanged", handleHRNotification);
-      try { charRef.current.stopNotifications(); } catch {}
+      try { charRef.current.stopNotifications(); } catch { /* already stopped */ }
       charRef.current = null;
     }
     if (serverRef.current?.connected) {

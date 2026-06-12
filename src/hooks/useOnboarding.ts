@@ -69,7 +69,7 @@ export function useOnboarding() {
       // Fallback
       try {
         window.localStorage?.setItem("biomusic_onboarding_complete", "true");
-      } catch {}
+      } catch { /* localStorage unavailable */ }
       setIsComplete(true);
     } catch {
       setIsComplete(true);
@@ -87,7 +87,7 @@ export function useOnboarding() {
       }
       try {
         window.localStorage?.removeItem("biomusic_onboarding_complete");
-      } catch {}
+      } catch { /* localStorage unavailable */ }
       setIsComplete(false);
     } catch {
       setIsComplete(false);

@@ -44,7 +44,7 @@ export function useUserMusicPreferences(activityType?: string) {
           activityType:       row.activity_type,
           preferredTempoAvg:  row.preferred_tempo_avg   ? Number(row.preferred_tempo_avg)   : null,
           preferredEnergyAvg: row.preferred_energy_avg  ? Number(row.preferred_energy_avg)  : null,
-          skipRate:           Number(row.skip_rate)      ?? 0,
+          skipRate:           Number(row.skip_rate ?? 0),
           likeCount:          row.like_count             ?? 0,
           sessionCount:       row.session_count          ?? 0,
         }))

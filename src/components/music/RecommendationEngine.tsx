@@ -335,7 +335,7 @@ export const RecommendationEngine = forwardRef<HTMLDivElement>((_, ref) => {
     setIsLoadingRecommendations(true);
 
     try {
-      let { tempo, energy } = profile.characteristics;
+      const { tempo, energy } = profile.characteristics;
       
       // Apply biometric adjustments if real-time mode is enabled
       let adjustedTempo = tempo.optimal;

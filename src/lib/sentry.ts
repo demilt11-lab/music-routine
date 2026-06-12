@@ -32,8 +32,8 @@ export async function initialiseSentry(): Promise<void> {
       ],
       beforeSend(event) {
         // Strip PII from breadcrumb URLs
-        if (event.breadcrumbs?.values) {
-          event.breadcrumbs.values = event.breadcrumbs.values.map((b) => ({
+        if (event.breadcrumbs) {
+          event.breadcrumbs = event.breadcrumbs.map((b) => ({
             ...b,
             data: b.data
               ? { ...b.data, url: b.data.url?.split('?')[0] }

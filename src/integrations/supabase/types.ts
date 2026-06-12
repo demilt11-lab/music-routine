@@ -241,29 +241,53 @@ export type Database = {
       }
       profiles: {
         Row: {
+          age: number | null
           avatar_url: string | null
+          biometric_consent_granted_at: string | null
+          biometric_consent_version: string | null
+          consent_ip_hash: string | null
           created_at: string
+          data_processing_consent_granted_at: string | null
           display_name: string | null
           email: string | null
+          gdpr_region: boolean | null
+          healthkit_consent_granted_at: string | null
           id: string
+          onboarding_completed: boolean
           preferences: Json | null
           updated_at: string
         }
         Insert: {
+          age?: number | null
           avatar_url?: string | null
+          biometric_consent_granted_at?: string | null
+          biometric_consent_version?: string | null
+          consent_ip_hash?: string | null
           created_at?: string
+          data_processing_consent_granted_at?: string | null
           display_name?: string | null
           email?: string | null
+          gdpr_region?: boolean | null
+          healthkit_consent_granted_at?: string | null
           id: string
+          onboarding_completed?: boolean
           preferences?: Json | null
           updated_at?: string
         }
         Update: {
+          age?: number | null
           avatar_url?: string | null
+          biometric_consent_granted_at?: string | null
+          biometric_consent_version?: string | null
+          consent_ip_hash?: string | null
           created_at?: string
+          data_processing_consent_granted_at?: string | null
           display_name?: string | null
           email?: string | null
+          gdpr_region?: boolean | null
+          healthkit_consent_granted_at?: string | null
           id?: string
+          onboarding_completed?: boolean
           preferences?: Json | null
           updated_at?: string
         }
@@ -428,6 +452,105 @@ export type Database = {
         }
         Relationships: []
       }
+      user_biometric_baseline: {
+        Row: {
+          created_at: string | null
+          eeg_baseline_alpha: number | null
+          eeg_baseline_beta: number | null
+          eeg_baseline_delta: number | null
+          eeg_baseline_gamma: number | null
+          eeg_baseline_theta: number | null
+          established_at: string | null
+          hrmax_estimate: number | null
+          hrv_baseline_rmssd: number | null
+          hrv_baseline_sdnn: number | null
+          id: string
+          last_updated_at: string | null
+          resting_hr: number | null
+          session_count: number | null
+          stress_baseline: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          eeg_baseline_alpha?: number | null
+          eeg_baseline_beta?: number | null
+          eeg_baseline_delta?: number | null
+          eeg_baseline_gamma?: number | null
+          eeg_baseline_theta?: number | null
+          established_at?: string | null
+          hrmax_estimate?: number | null
+          hrv_baseline_rmssd?: number | null
+          hrv_baseline_sdnn?: number | null
+          id?: string
+          last_updated_at?: string | null
+          resting_hr?: number | null
+          session_count?: number | null
+          stress_baseline?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          eeg_baseline_alpha?: number | null
+          eeg_baseline_beta?: number | null
+          eeg_baseline_delta?: number | null
+          eeg_baseline_gamma?: number | null
+          eeg_baseline_theta?: number | null
+          established_at?: string | null
+          hrmax_estimate?: number | null
+          hrv_baseline_rmssd?: number | null
+          hrv_baseline_sdnn?: number | null
+          id?: string
+          last_updated_at?: string | null
+          resting_hr?: number | null
+          session_count?: number | null
+          stress_baseline?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_music_preferences: {
+        Row: {
+          activity_type: string
+          created_at: string | null
+          id: string
+          last_updated: string | null
+          like_count: number | null
+          preferred_energy_avg: number | null
+          preferred_tempo_avg: number | null
+          session_count: number | null
+          skip_count: number | null
+          skip_rate: number | null
+          user_id: string
+        }
+        Insert: {
+          activity_type: string
+          created_at?: string | null
+          id?: string
+          last_updated?: string | null
+          like_count?: number | null
+          preferred_energy_avg?: number | null
+          preferred_tempo_avg?: number | null
+          session_count?: number | null
+          skip_count?: number | null
+          skip_rate?: number | null
+          user_id: string
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string | null
+          id?: string
+          last_updated?: string | null
+          like_count?: number | null
+          preferred_energy_avg?: number | null
+          preferred_tempo_avg?: number | null
+          session_count?: number | null
+          skip_count?: number | null
+          skip_rate?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -455,6 +578,48 @@ export type Database = {
           p256dh: string
           user_id: string
         }[]
+      }
+      check_biometric_consent: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
+      cleanup_orphan_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      delete_user_all_data: {
+        Args: { p_user_id: string }
+        Returns: Json
+      }
+      export_user_data: {
+        Args: { p_user_id: string }
+        Returns: Json
+      }
+      grant_biometric_consent: {
+        Args: { p_user_id: string; p_version?: string; p_ip_hash?: string | null }
+        Returns: undefined
+      }
+      purge_expired_biometric_data: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      revoke_biometric_consent: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+      store_user_key_in_vault: {
+        Args: { p_user_id: string; p_key_b64: string }
+        Returns: string
+      }
+      upsert_music_preference: {
+        Args: {
+          p_user_id: string
+          p_activity_type: string
+          p_tempo: number
+          p_energy: number
+          p_feedback: string
+        }
+        Returns: undefined
       }
     }
     Enums: {

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { LucideIcon } from "lucide-react";
 
@@ -7,9 +8,10 @@ interface EmptyStateProps {
   description: string;
   actionLabel?: string;
   onAction?: () => void;
+  action?: ReactNode;
 }
 
-export const EmptyState = ({ icon: Icon, title, description, actionLabel, onAction }: EmptyStateProps) => (
+export const EmptyState = ({ icon: Icon, title, description, actionLabel, onAction, action }: EmptyStateProps) => (
   <div className="text-center py-12">
     <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
       <Icon className="w-8 h-8 text-muted-foreground/60" />
@@ -19,5 +21,6 @@ export const EmptyState = ({ icon: Icon, title, description, actionLabel, onActi
     {actionLabel && onAction && (
       <Button onClick={onAction} variant="outline">{actionLabel}</Button>
     )}
+    {action}
   </div>
 );

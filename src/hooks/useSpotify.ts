@@ -74,14 +74,14 @@ function storeTokens(tokens: SpotifyTokens) {
   if (!canUseStorage()) return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tokens));
-  } catch {}
+  } catch { /* localStorage unavailable */ }
 }
 
 function clearTokens() {
   if (!canUseStorage()) return;
   try {
     window.localStorage.removeItem(STORAGE_KEY);
-  } catch {}
+  } catch { /* localStorage unavailable */ }
 }
 
 function mapSpotifyTrack(raw: any): SpotifyTrack {
@@ -593,7 +593,7 @@ export function useSpotify(
           setIsConnected(true);
           toast.success("Connected to Spotify!");
         }
-      } catch {}
+      } catch { /* malformed token payload */ }
     };
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);

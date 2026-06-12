@@ -49,12 +49,15 @@ interface CurrentSong {
   energy?: number;
 }
 
-// Typed user preferences — replaces previous `any` that bypassed TypeScript
+// Typed user preferences — matches the FeedbackSummary produced by
+// useTrackFeedback and the shape the adaptive-music edge function consumes.
 interface UserPreferences {
-  preferredGenres?: string[];
-  avoidedGenres?: string[];
-  preferredTempoRange?: [number, number];
-  preferredEnergyRange?: [number, number];
+  likedArtists: string[];
+  dislikedArtists: string[];
+  likedTempoRange: { min: number; max: number } | null;
+  dislikedTempoRange: { min: number; max: number } | null;
+  likedEnergyRange: { min: number; max: number } | null;
+  preferenceDescription: string;
 }
 
 export function useAdaptiveMusic(activityType: string = "study") {

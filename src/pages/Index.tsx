@@ -17,7 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 const Index = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
-  const { showOnboarding, isLoading, completeOnboarding } = useOnboarding();
+  const { isComplete, isLoading, completeOnboarding } = useOnboarding();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
 
@@ -43,7 +43,7 @@ const Index = () => {
   };
 
   // Show onboarding for first-time mobile users
-  if (isMobile && showOnboarding && !isLoading) {
+  if (isMobile && isComplete === false && !isLoading) {
     return <MobileOnboarding onComplete={completeOnboarding} />;
   }
 

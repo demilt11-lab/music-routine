@@ -27,6 +27,7 @@ import { PredictiveQueueBuilder } from "./PredictiveQueueBuilder";
 import { ActivityStartingRecommendation } from "./ActivityStartingRecommendation";
 import { LiveAdaptationFeed, type AdaptationEvent } from "./LiveAdaptationFeed";
 import { BiometricMusicMapper } from "./BiometricMusicMapper";
+import { BiometricConsentModal } from "@/components/BiometricConsentModal";
 import { useActivityStartingSong } from "@/hooks/useActivityStartingSong";
 import { MusicPlayer } from "@/components/music/MusicPlayer";
 import { EEGReading } from "@/hooks/useMuseEEG";
@@ -209,50 +210,26 @@ const syncSessionBuffersToState = useCallback(() => {
   // Timer for active session with milestone notifications
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
-    if {step === "active" && (
-  <ActiveSessionPanel
-    selectedActivityName={selectedActivity?.name}
-    elapsedTime={elapsedTime}
-    flowState={biometricState.flowState}
-    currentReading={{
-      heartRate: biometricState.currentReading?.heartRate,
-      stressLevel: biometricState.currentReading?.stressLevel,
-      focusScore: biometricState.currentReading?.focusScore,
-      relaxationScore: biometricState.currentReading?.relaxationScore,
-    }}
-    readingCount={biometricState.readings.length}
-    jamendo={{
-      currentTrack: jamendo.currentTrack,
-      isPlaying: jamendo.isPlaying,
-      togglePlay: jamendo.togglePlay,
-      play: jamendo.play,
-      loadByMood: jamendo.loadByMood,
-      tracks: jamendo.tracks,
-      audioRef: jamendo.audioRef,
-    }}
-    adaptiveMusicState={{
-      isEnabled: adaptiveMusic.state.isEnabled,
-      currentRecommendation: adaptiveMusic.state.currentRecommendation,
-    }}
-    autoPlayQueue={{
-      state: autoPlayQueue.state,
-      enableAutoPlay: autoPlayQueue.enableAutoPlay,
-      disableAutoPlay: autoPlayQueue.disableAutoPlay,
-      skipToNext: autoPlayQueue.skipToNext,
-      getCurrentTrack: autoPlayQueue.getCurrentTrack,
-      addToQueue: autoPlayQueue.addToQueue,
-    }}
-    adaptationEvents={adaptationEvents}
-    trackFeedback={{
-      getFeedback: trackFeedback.getFeedback,
-      submitFeedback: trackFeedback.submitFeedback,
-    }}
-    onEndSession={handleEndSession}
-    onResetRecommendationDedup={() => {
-      lastRecommendationRef.current = null;
-    }}
-  />
-)}
+    if (step === "active" && startTime) {
+      interval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime.getTime()) / 1000);
+        setElapsedTime(elapsed);
+
+        // Check for session time milestones (every 15 minutes)
+        const currentMilestone = Math.floor(elapsed / 900); // 900 seconds = 15 minutes
+        if (currentMilestone > sessionMilestoneRef.current && currentMilestone > 0) {
+          sessionMilestoneRef.current = currentMilestone;
+          const minutes = currentMilestone * 15;
+          const activity = selectedActivityRef.current;
+          flowNotificationsRef.current.notifySessionMilestone(
+            `${minutes} Minutes Complete!`,
+            `Great job staying focused for ${minutes} minutes${activity ? ` on ${activity.name}` : ""}`
+          );
+        }
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [step, startTime]);
 
   // Auto-play: Handle track ending and queue next song
   useEffect(() => {
@@ -476,6 +453,29 @@ const syncSessionBuffersToState = useCallback(() => {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  // Biometric consent gate (GDPR / HealthKit guidelines) — the DB trigger
+  // hard-rejects biometric inserts without consent, so block session start
+  // until the user has granted it.
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const [consentUserId, setConsentUserId] = useState<string | null>(null);
+  const hasConsentRef = useRef<boolean | null>(null);
+
+  const ensureBiometricConsent = useCallback(async (userId: string): Promise<boolean> => {
+    if (hasConsentRef.current === true) return true;
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("biometric_consent_granted_at")
+      .eq("id", userId)
+      .single();
+    const granted = !!profile?.biometric_consent_granted_at;
+    hasConsentRef.current = granted;
+    if (!granted) {
+      setConsentUserId(userId);
+      setShowConsentModal(true);
+    }
+    return granted;
+  }, []);
+
   const handleActivitySelect = (activity: ActivityType) => {
     setSelectedActivity(activity);
     fetchStartingSong(activity.id);
@@ -493,6 +493,9 @@ const syncSessionBuffersToState = useCallback(() => {
       toast.error("Please sign in to start a session");
       return;
     }
+
+    const consented = await ensureBiometricConsent(user.id);
+    if (!consented) return; // consent modal shown; session resumes after consent
 
     // Create session in database
     const { data: session, error } = await supabase
@@ -672,6 +675,21 @@ const syncSessionBuffersToState = useCallback(() => {
 
   return (
     <Card className="border-primary/20">
+      {showConsentModal && consentUserId && (
+        <BiometricConsentModal
+          userId={consentUserId}
+          onConsented={() => {
+            hasConsentRef.current = true;
+            setShowConsentModal(false);
+            toast.success("Consent recorded — starting your session.");
+            handleStartSession();
+          }}
+          onDeclined={() => {
+            setShowConsentModal(false);
+            toast.info("Biometric tracking requires consent. Session not started.");
+          }}
+        />
+      )}
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Activity className="w-5 h-5 text-primary" />
