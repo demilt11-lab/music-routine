@@ -119,6 +119,22 @@ UPDATE public.listening_sessions SET
 WHERE id = '00000000-0000-0000-0000-000000000051'::uuid;
 \echo T10 PASS: session/song training-signal columns all writable
 
+-- T10b: learning loop aggregates session_songs deltas into the song profile
+SELECT public.aggregate_session_learning('00000000-0000-0000-0000-000000000051'::uuid);
+DO $$
+DECLARE v_hr DOUBLE PRECISION; v_flow DOUBLE PRECISION;
+BEGIN
+  SELECT avg_hr_delta_60s, state_transition_rate INTO v_hr, v_flow
+  FROM public.songs WHERE id = '00000000-0000-0000-0000-0000000000d1';
+  IF v_hr IS DISTINCT FROM -2.5 THEN
+    RAISE EXCEPTION 'song avg_hr_delta_60s not aggregated: got %', v_hr;
+  END IF;
+  IF v_flow IS DISTINCT FROM 1.0 THEN
+    RAISE EXCEPTION 'song state_transition_rate not aggregated: got %', v_flow;
+  END IF;
+END $$;
+\echo T10b PASS: learning loop rolls play deltas into song response profile
+
 -- T11: vault key storage records a reference row
 SELECT public.store_user_key_in_vault('00000000-0000-0000-0000-00000000000a'::uuid, 'dGVzdC1rZXk=');
 DO $$ BEGIN

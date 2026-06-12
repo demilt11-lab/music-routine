@@ -164,7 +164,7 @@ serve(async (req) => {
       case "complete_song_play": {
         // H-2: write post-play outcome to session_songs so training signals are captured
         const { session_id, song_id, hr_delta, focus_delta, contributed_to_flow,
-                biometric_state_at_end } = body;
+                biometric_state_at_end, skipped } = body;
         if (!session_id || !song_id) throw new Error("session_id and song_id required");
         // Service-role client bypasses RLS — verify session ownership first
         const { data: ownedSession } = await supabase
@@ -177,8 +177,11 @@ serve(async (req) => {
             status: 404, headers: CORS_HEADERS,
           });
         }
+        // A skipped track is "completed" only in the sense that its outcome is
+        // final — flag the skip so it lands as a negative training signal.
         await supabase.from("session_songs").update({
           completed:              true,
+          skipped:                skipped ?? false,
           hr_delta:               hr_delta   ?? null,
           focus_delta:            focus_delta ?? null,
           contributed_to_flow:    contributed_to_flow ?? false,

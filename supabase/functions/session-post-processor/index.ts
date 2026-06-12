@@ -113,13 +113,24 @@ serve(async (req) => {
       return current * (1 - weight) + observed * weight;
     };
 
-    const newRestingHr = avg(hrs.slice(0, Math.max(5, Math.floor(hrs.length * 0.1))));
+    // Resting HR from the lowest-activity segment (10th-percentile HR),
+    // not the first 10% of the session — the opening minutes are often the
+    // most active. HRmax is the highest plausible HR actually observed.
+    const sortedHrs   = [...hrs].sort((a, b) => a - b);
+    const lowDecile   = sortedHrs.slice(0, Math.max(5, Math.floor(sortedHrs.length * 0.1)));
+    const newRestingHr = avg(lowDecile);
+    const observedHrmax = hrs.length ? Math.max(...hrs) : null;
+
     if (baseline) {
       await supabase.from("user_biometric_baseline").update({
         resting_hr:         ema(baseline.resting_hr,         newRestingHr),
         hrv_baseline_rmssd: ema(baseline.hrv_baseline_rmssd, avg(hrvs)),
+        // HRmax only ratchets up — a single hard session shouldn't lower it
+        hrmax_estimate:     observedHrmax !== null
+          ? Math.max(baseline.hrmax_estimate ?? 0, observedHrmax)
+          : baseline.hrmax_estimate,
         session_count:      (baseline.session_count ?? 0) + 1,
-        established_at:     baseline.session_count >= 2 ? (baseline.established_at ?? new Date().toISOString()) : null,
+        established_at:     (baseline.session_count ?? 0) >= 2 ? (baseline.established_at ?? new Date().toISOString()) : baseline.established_at,
         last_updated_at:    new Date().toISOString(),
       }).eq("user_id", user.id);
     } else {
@@ -127,10 +138,18 @@ serve(async (req) => {
         user_id:            user.id,
         resting_hr:         newRestingHr,
         hrv_baseline_rmssd: avg(hrvs),
+        hrmax_estimate:     observedHrmax,
         session_count:      1,
         last_updated_at:    new Date().toISOString(),
       });
     }
+
+    // Close the learning loop: roll this session's per-play training signals
+    // into each touched song's physiological response profile.
+    const { error: learnErr } = await supabase.rpc("aggregate_session_learning", {
+      p_session_id: session_id,
+    });
+    if (learnErr) console.error("[session-post-processor] learning aggregation failed:", learnErr.message);
 
     return new Response(JSON.stringify({ success: true, report }), {
       headers: { ...CORS, "Content-Type": "application/json" },
