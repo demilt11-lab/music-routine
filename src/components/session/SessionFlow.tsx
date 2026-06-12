@@ -196,7 +196,12 @@ const syncSessionBuffersToState = useCallback(() => {
   // Route an engine-selected song into actual playback. The deterministic
   // engine has already enforced state, BPM-transition and speechiness
   // constraints server-side; here we just play it (Spotify, Jamendo fallback).
-  const handleEngineTrack = useCallback((song: EngineSelectedSong, reason: string) => {
+  const handleEngineTrack = useCallback((
+    song: EngineSelectedSong,
+    reason: string,
+    _urgency: string,
+    transitionSequence: EngineSelectedSong[] = [],
+  ) => {
     addAdaptationEvent({
       type: "track_change",
       title: `Engine: ${song.title}`,
@@ -209,16 +214,25 @@ const syncSessionBuffersToState = useCallback(() => {
       },
     });
 
-    const spotifyUri = song.spotify_track_id
-      ? `spotify:track:${song.spotify_track_id}`
-      : song.spotify_id
-        ? `spotify:track:${song.spotify_id}`
+    const uriOf = (s: EngineSelectedSong) =>
+      s.spotify_track_id ? `spotify:track:${s.spotify_track_id}`
+        : s.spotify_id ? `spotify:track:${s.spotify_id}`
         : null;
 
+    const spotifyUri = uriOf(song);
     if (spotifyUri) {
       window.dispatchEvent(new CustomEvent("adaptive-spotify-play", {
         detail: { uri: spotifyUri, name: song.title, artist: song.artist },
       }));
+      // Progressive BPM ramp: push the follow-up songs into Spotify's native
+      // queue so the transition continues even without further triggers
+      for (const next of transitionSequence) {
+        const nextUri = uriOf(next);
+        if (!nextUri) continue;
+        void supabase.functions.invoke("dsp-connector", {
+          body: { action: "queue_next", track_uri: nextUri },
+        }).catch((err) => console.error("Failed to queue transition track:", err));
+      }
     } else {
       // No Spotify id — let Jamendo find the closest match by tempo/energy
       void jamendo.searchByTempoEnergy(song.tempo ?? 110, song.energy ?? 0.5, selectedActivity?.name)
@@ -226,7 +240,20 @@ const syncSessionBuffersToState = useCallback(() => {
           if (tracks.length > 0) jamendo.play(tracks[0]);
         });
     }
-  }, [addAdaptationEvent, jamendo, selectedActivity?.name]);
+
+    if (transitionSequence.length > 0) {
+      // Mirror the ramp in the visible auto-play queue
+      autoPlayQueue.addToQueue(transitionSequence.map((s) => ({
+        id: s.id,
+        title: s.title,
+        artist: s.artist,
+        tempo: s.tempo ?? 110,
+        energy: s.energy ?? 0.5,
+        source: "recommendation" as const,
+        reason: "BPM transition ramp",
+      })));
+    }
+  }, [addAdaptationEvent, jamendo, selectedActivity?.name, autoPlayQueue]);
 
   const reactiveEngine = useReactiveEngine({
     sessionId,
@@ -585,6 +612,15 @@ const syncSessionBuffersToState = useCallback(() => {
     const consented = await ensureBiometricConsent(user.id);
     if (!consented) return; // consent modal shown; session resumes after consent
 
+    // Pre-session readiness: HRV trend vs baseline + recent flow momentum
+    let readiness: { readiness_score: number; predicted_flow_potential: string } | null = null;
+    try {
+      const { data: readinessData } = await supabase.rpc("compute_readiness", { p_user_id: user.id });
+      if (readinessData && typeof readinessData === "object" && "readiness_score" in readinessData) {
+        readiness = readinessData as unknown as { readiness_score: number; predicted_flow_potential: string };
+      }
+    } catch { /* readiness is best-effort — never block session start */ }
+
     // Create session in database
     const { data: session, error } = await supabase
       .from("listening_sessions")
@@ -594,6 +630,8 @@ const syncSessionBuffersToState = useCallback(() => {
         name: `${selectedActivity.name} Session`,
         mood_before: moodBefore,
         started_at: new Date().toISOString(),
+        readiness_score: readiness?.readiness_score ?? null,
+        predicted_flow_potential: readiness?.predicted_flow_potential ?? null,
       })
       .select()
       .single();
@@ -608,9 +646,12 @@ const syncSessionBuffersToState = useCallback(() => {
     startTracking(session.id);
     setStep("active");
     toast.success("Session started! Play some music and we'll track your biometrics.");
+    if (readiness) {
+      toast.info(`Flow potential today: ${readiness.predicted_flow_potential} (readiness ${Math.round(readiness.readiness_score)}/100)`);
+    }
   };
 
-  const handleHeartRateUpdate = useCallback((heartRate: number) => {
+  const handleHeartRateUpdate = useCallback((heartRate: number, hrv?: { rmssd: number; sdnn: number }) => {
     // Calculate other metrics based on heart rate
     const baseStress = Math.max(0, Math.min(100, (heartRate - 60) * 1.5 + Math.random() * 10));
     const relaxation = Math.max(0, Math.min(100, 100 - baseStress + Math.random() * 10));
@@ -618,12 +659,17 @@ const syncSessionBuffersToState = useCallback(() => {
 
     const reading = {
       heartRate,
-      heartRateVariability: Math.round(50 - (heartRate - 70) * 0.3 + Math.random() * 10),
+      // Real RMSSD from BLE RR intervals when the strap provides them;
+      // the synthetic estimate only fills in until enough beats arrive
+      heartRateVariability: hrv
+        ? Math.round(hrv.rmssd)
+        : Math.round(50 - (heartRate - 70) * 0.3 + Math.random() * 10),
       stressLevel: Math.round(baseStress),
       relaxationScore: Math.round(relaxation),
       focusScore: Math.round(focus),
       deviceType: "bluetooth_hr",
       recordedAt: new Date(),
+      confidence: (hrv ? "high" : "medium") as "high" | "medium",
     };
 
     addReading(reading);

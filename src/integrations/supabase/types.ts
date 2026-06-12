@@ -628,6 +628,10 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: boolean
       }
+      compute_readiness: {
+        Args: { p_user_id: string }
+        Returns: Json
+      }
       cleanup_orphan_sessions: {
         Args: Record<PropertyKey, never>
         Returns: number

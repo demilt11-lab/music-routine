@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import { parseHeartRateMeasurement, RrIntervalBuffer, type HrvSnapshot } from "@/lib/hrv";
 
 export interface BluetoothDevice {
   id: string;
@@ -25,7 +26,7 @@ interface UseWebBluetoothReturn {
   scanForDevices: () => Promise<void>;
   connect: (deviceId?: string) => Promise<boolean>;
   disconnect: () => void;
-  onHeartRateChange: (callback: (heartRate: number) => void) => void;
+  onHeartRateChange: (callback: (heartRate: number, hrv?: HrvSnapshot) => void) => void;
 }
 
 const HEART_RATE_SERVICE = "heart_rate";
@@ -107,8 +108,9 @@ export function useWebBluetooth(): UseWebBluetoothReturn {
 
   const rawDeviceRef = useRef<any>(null);
   const gattServer = useRef<any>(null);
-  const heartRateCallback = useRef<((heartRate: number) => void) | null>(null);
+  const heartRateCallback = useRef<((heartRate: number, hrv?: HrvSnapshot) => void) | null>(null);
   const characteristicRef = useRef<any>(null);
+  const rrBufferRef = useRef(new RrIntervalBuffer());
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 3;
 
@@ -131,29 +133,21 @@ export function useWebBluetooth(): UseWebBluetoothReturn {
     };
   }, []);
 
-  const onHeartRateChange = useCallback((callback: (heartRate: number) => void) => {
+  const onHeartRateChange = useCallback((callback: (heartRate: number, hrv?: HrvSnapshot) => void) => {
     heartRateCallback.current = callback;
   }, []);
-
-  const parseHeartRate = (value: DataView): number => {
-    if (!value || value.byteLength < 2) return 0;
-    const flags = value.getUint8(0);
-    const is16Bit = flags & 0x01;
-    if (is16Bit) {
-      if (value.byteLength < 3) return 0;
-      return value.getUint16(1, true);
-    }
-    return value.getUint8(1);
-  };
 
   const handleHeartRateNotification = useCallback((event: Event) => {
     const target = event.target as any;
     const value = target?.value;
     if (value) {
-      const heartRate = parseHeartRate(value);
+      // Full 0x2A37 parse — HR plus the RR intervals real HRV comes from
+      const { heartRate, rrIntervalsMs } = parseHeartRateMeasurement(value);
       if (heartRate > 0) {
+        rrBufferRef.current.push(rrIntervalsMs);
+        const hrv = rrBufferRef.current.snapshot() ?? undefined;
         setState((prev) => ({ ...prev, lastHeartRate: heartRate }));
-        heartRateCallback.current?.(heartRate);
+        heartRateCallback.current?.(heartRate, hrv);
       }
     }
   }, []);

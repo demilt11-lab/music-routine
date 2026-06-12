@@ -12,7 +12,7 @@ import { HealthKitConnector } from "@/components/biometrics/HealthKitConnector";
 import { BluetoothSetupGuide } from "@/components/session/BluetoothSetupGuide";
 
 interface DeviceConnectorProps {
-  onHeartRateUpdate?: (heartRate: number) => void;
+  onHeartRateUpdate?: (heartRate: number, hrv?: { rmssd: number; sdnn: number }) => void;
   onConnectionChange?: (connected: boolean) => void;
 }
 

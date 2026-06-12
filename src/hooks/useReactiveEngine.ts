@@ -50,7 +50,12 @@ interface UseReactiveEngineOptions {
   sessionId: string | null;
   activityName: string | null;
   enabled: boolean;
-  onTrackSelected?: (song: EngineSelectedSong, reason: string, urgency: Urgency) => void;
+  onTrackSelected?: (
+    song: EngineSelectedSong,
+    reason: string,
+    urgency: Urgency,
+    transitionSequence?: EngineSelectedSong[],
+  ) => void;
   onFlowEvent?: (event: FlowEventName, durationS: number) => void;
 }
 
@@ -287,7 +292,9 @@ export function useReactiveEngine({
           await recordTrackOutcome(false);
           currentTrackRef.current = { songId: song.id, startedAt: Date.now(), tempo: song.tempo };
           playedIdsRef.current.push(song.id);
-          callbacksRef.current.onTrackSelected?.(song, data?.reason ?? result.state, decision.urgency);
+          const sequence = (data?.transition_sequence ?? []) as EngineSelectedSong[];
+          for (const s of sequence) playedIdsRef.current.push(s.id);
+          callbacksRef.current.onTrackSelected?.(song, data?.reason ?? result.state, decision.urgency, sequence);
         }
       } catch (err) {
         console.error("[reactive-engine] playlist-engine call failed:", err);
