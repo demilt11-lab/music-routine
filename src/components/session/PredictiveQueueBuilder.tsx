@@ -96,6 +96,7 @@ export const PredictiveQueueBuilder: React.FC<PredictiveQueueBuilderProps> = ({
       }
     } catch (error) {
       console.error('Error loading tracks for segment:', error);
+      toast.error('Could not load music for the upcoming session segment. Retrying next cycle.');
     } finally {
       setIsLoadingTracks(false);
     }

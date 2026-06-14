@@ -245,34 +245,50 @@ export function passesSpeechinessFilter(
 }
 
 // ── HTTP handler ─────────────────────────────────────────────
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const ORIGIN = Deno.env.get("APP_ORIGIN") ?? "*";
+const CORS = {
+  "Access-Control-Allow-Origin":  ORIGIN,
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type",
+};
+
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { ...CORS, "Content-Type": "application/json" },
+  });
+
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, {
-      headers: {
-        "Access-Control-Allow-Origin":  Deno.env.get("APP_ORIGIN") ?? "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Authorization, Content-Type",
-      },
-    });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
+
+  // Require valid JWT — classifier processes sensitive biometric data
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return json({ error: "Unauthorized" }, 401);
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+  );
+  const { data: { user }, error: authErr } = await supabase.auth.getUser(
+    authHeader.replace("Bearer ", ""),
+  );
+  if (authErr || !user) return json({ error: "Unauthorized" }, 401);
 
   try {
     const body = await req.json();
-    const { window: bioWindow, activity_type, user_override_speechiness } = body;
+    const { window: bioWindow, activity_type } = body;
+
+    if (!bioWindow || typeof bioWindow !== "object") {
+      return json({ error: "Missing or invalid biometric window" }, 400);
+    }
 
     const profile = ACTIVITY_PROFILES[activity_type ?? "study"] ?? ACTIVITY_PROFILES["study"];
     const result  = classifyBiometricState(bioWindow, profile);
 
-    return new Response(JSON.stringify(result), {
-      headers: {
-        "Content-Type":               "application/json",
-        "Access-Control-Allow-Origin": Deno.env.get("APP_ORIGIN") ?? "*",
-      },
-    });
+    return json(result);
   } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return json({ error: String(err) }, 400);
   }
 });

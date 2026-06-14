@@ -8,8 +8,9 @@ import {
   type StateClass,
 } from "../state-classifier/index.ts";
 
+import { ORIGIN } from "../_shared/cors.ts";
 const CORS_HEADERS = {
-  "Access-Control-Allow-Origin":  Deno.env.get("APP_ORIGIN") ?? "*",
+  "Access-Control-Allow-Origin":  ORIGIN,
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Authorization, Content-Type",
 };

@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     url: 'https://476c1409-512d-4288-8f4a-c29b42d4e4aa.lovableproject.com?forceHideBadge=true',
-    cleartext: true
+    cleartext: false
   },
   plugins: {
     SplashScreen: {
@@ -34,7 +34,7 @@ const config: CapacitorConfig = {
       NSHealthUpdateUsageDescription: 'BioMusic may store wellness insights derived from your listening sessions.',
       NSBluetoothAlwaysUsageDescription: 'BioMusic uses Bluetooth to connect to heart rate monitors for real-time biometric tracking during sessions.',
       NSBluetoothPeripheralUsageDescription: 'BioMusic connects to Bluetooth heart rate monitors to track your biometric state.',
-      UIBackgroundModes: ['fetch', 'processing']
+      UIBackgroundModes: ['fetch', 'processing', 'bluetooth-central']
     }
   },
   android: {

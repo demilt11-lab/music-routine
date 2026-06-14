@@ -227,7 +227,7 @@ export const RecommendationEngine = forwardRef<HTMLDivElement>((_, ref) => {
       const activityMap = new Map<string, {
         activityName: string;
         sessions: typeof sessions;
-        songs: any[];
+        songs: Array<{ id: string; title: string; artist: string; tempo: number | null; energy: number | null; flowScore?: number }>;
         flowScores: number[];
       }>();
 
@@ -253,7 +253,7 @@ export const RecommendationEngine = forwardRef<HTMLDivElement>((_, ref) => {
           const avgRelax = sessionBiometrics.reduce((sum, b) => sum + (b.relaxation_score || 0), 0) / sessionBiometrics.length;
           const flowScore = (avgFocus + avgRelax) / 2;
           
-          session.session_songs?.forEach((ss: any) => {
+          session.session_songs?.forEach((ss: { songs: { id: string; title: string; artist: string; tempo: number | null; energy: number | null } | null }) => {
             if (ss.songs) {
               entry.songs.push({ ...ss.songs, flowScore });
               entry.flowScores.push(flowScore);

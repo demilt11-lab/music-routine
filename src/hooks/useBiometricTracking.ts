@@ -200,7 +200,7 @@ export function useBiometricTracking(): UseBiometricTrackingReturn {
     const isReal      = partialReading.deviceType && !isSimulated;
 
     // Detect SpO2 artifact (< 70 or > 100) — flag confidence as low, do NOT reject
-    const bloodOxygen = (partialReading as any).bloodOxygen as number | undefined;
+    const bloodOxygen = (partialReading as Record<string, unknown>).bloodOxygen as number | undefined;
     const spO2Artifact = !isSimulated && bloodOxygen !== undefined && spO2ArtifactFlag(bloodOxygen);
 
     // Detect EEG artifact (un-normalized absolute powers or all-zero) — skip for simulated readings

@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+import { ORIGIN } from "../_shared/cors.ts";
 const CORS = {
-  "Access-Control-Allow-Origin":  Deno.env.get("APP_ORIGIN") ?? "*",
+  "Access-Control-Allow-Origin":  ORIGIN,
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Authorization, Content-Type",
 };

@@ -116,21 +116,22 @@ export function useActivityStartingSong(): UseActivityStartingSongReturn {
         : null;
 
       // Get top played songs (non-skipped, longest play time)
+      type SongRow = { id: string; title: string; artist: string; tempo: number | null; energy: number | null };
       const songEntries = (songsResult.data || [])
-        .filter((ss: any) => ss.songs)
-        .map((ss: any) => ss.songs);
+        .filter((ss): ss is { songs: SongRow } => !!ss.songs)
+        .map((ss) => ss.songs);
 
       // Deduplicate by song id, keep first occurrence (highest play duration)
       const seen = new Set<string>();
-      const topSongs = songEntries.filter((s: any) => {
+      const topSongs = songEntries.filter((s) => {
         if (seen.has(s.id)) return false;
         seen.add(s.id);
         return true;
       }).slice(0, 5);
 
       // Calculate optimal tempo/energy from top songs
-      const songsWithTempo = topSongs.filter((s: any) => s.tempo != null);
-      const songsWithEnergy = topSongs.filter((s: any) => s.energy != null);
+      const songsWithTempo = topSongs.filter((s) => s.tempo != null);
+      const songsWithEnergy = topSongs.filter((s) => s.energy != null);
 
       // Get activity name for defaults
       const { data: activityType } = await supabase
@@ -141,10 +142,10 @@ export function useActivityStartingSong(): UseActivityStartingSongReturn {
       const defaults = activityDefaults[activityType?.name || "study"] || activityDefaults.study;
 
       const optimalTempo = songsWithTempo.length > 0
-        ? Math.round(songsWithTempo.reduce((s: number, r: any) => s + r.tempo, 0) / songsWithTempo.length)
+        ? Math.round(songsWithTempo.reduce((s, r) => s + (r.tempo ?? 0), 0) / songsWithTempo.length)
         : defaults.tempo;
       const optimalEnergy = songsWithEnergy.length > 0
-        ? Math.round((songsWithEnergy.reduce((s: number, r: any) => s + r.energy, 0) / songsWithEnergy.length) * 100) / 100
+        ? Math.round((songsWithEnergy.reduce((s, r) => s + (r.energy ?? 0), 0) / songsWithEnergy.length) * 100) / 100
         : defaults.energy;
 
       // Last session summary
@@ -156,7 +157,7 @@ export function useActivityStartingSong(): UseActivityStartingSongReturn {
       setRecommendation({
         optimalTempo,
         optimalEnergy,
-        topSongs: topSongs.map((s: any) => ({
+        topSongs: topSongs.map((s) => ({
           id: s.id,
           title: s.title,
           artist: s.artist,

@@ -78,28 +78,38 @@ export function useMuseEEG(): UseMuseEEGReturn {
     eegCallbackRef.current = callback;
   }, []);
 
-  // Calculate band power from raw EEG samples using simple moving average
-  const calculateBandPower = useCallback((samples: number[], sampleRate: number = 256): Record<string, number> => {
-    if (samples.length < 256) {
+  // Calculate RELATIVE band powers (0-1 each, summing to 1.0) from raw EEG samples.
+  // Uses variance-proxy approximation — a real implementation would use Welch/FFT.
+  // Returns RELATIVE powers so callers (state-classifier) receive correctly-scaled values.
+  const calculateBandPower = useCallback((samples: number[]): Record<string, number> => {
+    if (samples.length < 128) {
       return { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0 };
     }
 
-    // Simple power calculation using variance in frequency bands
-    // In a real implementation, this would use FFT
     const recent = samples.slice(-256);
     const mean = recent.reduce((a, b) => a + b, 0) / recent.length;
-    const variance = recent.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / recent.length;
-    
-    // Simulate band powers based on signal characteristics
-    // Higher variance typically indicates more beta/gamma activity
-    const totalPower = Math.sqrt(variance);
-    
+    const variance = recent.reduce((a, b) => a + (b - mean) ** 2, 0) / recent.length;
+    const rms = Math.sqrt(variance) + 1e-6; // root-mean-square, avoid /0
+
+    // Proxy weights derived from signal energy at different frequency bands.
+    // Higher RMS amplitude → more high-frequency (beta/gamma) dominance.
+    const raw = {
+      delta: Math.max(0, 1 - rms / 80),                          // slow waves dominate at low RMS
+      theta: Math.max(0, (60 - Math.abs(rms - 40)) / 60),
+      alpha: Math.max(0, (50 - Math.abs(rms - 25)) / 50),
+      beta:  Math.min(1, rms / 60),
+      gamma: Math.min(1, rms / 120),
+    };
+
+    // Normalize to relative powers (sum = 1.0) so downstream classifier
+    // receives values in the documented 0-1 range (eeg_alpha_rel, etc.)
+    const total = Object.values(raw).reduce((a, b) => a + b, 0) || 1;
     return {
-      delta: Math.max(0, 1 - totalPower / 100) * 4,
-      theta: Math.max(0, (50 - Math.abs(totalPower - 50)) / 50) * 8,
-      alpha: Math.max(0, (30 - Math.abs(totalPower - 30)) / 30) * 12,
-      beta: Math.min(totalPower / 20, 30),
-      gamma: Math.min(totalPower / 10, 50),
+      delta: raw.delta / total,
+      theta: raw.theta / total,
+      alpha: raw.alpha / total,
+      beta:  raw.beta  / total,
+      gamma: raw.gamma / total,
     };
   }, []);
 
