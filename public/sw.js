@@ -2,9 +2,15 @@
 
 // ── Cache versioning ──────────────────────────────────────────────────────────
 // Bump CACHE_VERSION on every production deploy to bust stale assets.
-// In CI, this value should be replaced with the build hash via sed/envsubst.
 const CACHE_VERSION = "biomusic-v3";
 const CACHE_NAME = CACHE_VERSION;
+
+// ── Precache manifest ─────────────────────────────────────────────────────────
+// vite-plugin-pwa (injectManifest strategy) replaces self.__WB_MANIFEST at build
+// time with the full list of versioned assets to precache. Falls back to [] in
+// development (where VitePWA is disabled and this file is served as-is).
+// eslint-disable-next-line no-undef
+const WB_MANIFEST = (typeof self.__WB_MANIFEST !== "undefined" ? self.__WB_MANIFEST : []);
 
 const hostname = self.location.hostname;
 
@@ -21,8 +27,11 @@ if (hostname === "localhost" || hostname === "127.0.0.1") {
   self.addEventListener("install", (event) => {
     event.waitUntil(
       caches.open(CACHE_NAME).then((cache) =>
-        // offline.html MUST be precached so it's available without a network
-        cache.addAll(["/", "/offline.html", "/app-icon.png", "/manifest.json"])
+        // Precache the app shell + all versioned assets injected by vite-plugin-pwa
+        cache.addAll([
+          "/offline.html",
+          ...WB_MANIFEST.map((e) => e.url),
+        ])
       ).then(() => self.skipWaiting())
     );
   });
