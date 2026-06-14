@@ -508,7 +508,8 @@ export default function SessionHistory() {
               icon={Activity}
               title="Failed to load sessions"
               description={error}
-              action={<Button onClick={() => window.location.reload()}>Retry</Button>}
+              onAction={() => window.location.reload()}
+              actionLabel="Retry"
             />
           </CardContent>
         </Card>
@@ -517,7 +518,8 @@ export default function SessionHistory() {
           icon={Music}
           title="No sessions yet"
           description="Start a listening session to see your history here"
-          action={<Button onClick={handleGoToDashboard}>Go to Dashboard</Button>}
+          onAction={handleGoToDashboard}
+          actionLabel="Go to Dashboard"
         />
       ) : (
         <>

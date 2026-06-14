@@ -48,8 +48,9 @@ export const RecentSessionWidget = forwardRef<HTMLDivElement>((_, ref) => {
     const avgFocus = biometrics?.length
       ? Math.round(biometrics.reduce((sum, b) => sum + (b.focus_score || 0), 0) / biometrics.length)
       : null;
-    const avgHR = biometrics?.length
-      ? Math.round(biometrics.reduce((sum, b) => sum + (b.heart_rate || 0), 0) / biometrics.filter(b => b.heart_rate).length)
+    const hrReadings = biometrics?.filter(b => b.heart_rate) ?? [];
+    const avgHR = hrReadings.length
+      ? Math.round(hrReadings.reduce((sum, b) => sum + (b.heart_rate || 0), 0) / hrReadings.length)
       : null;
 
     return {

@@ -29,7 +29,7 @@ export function useUserMusicPreferences(activityType?: string) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const query = supabase
+      const query = (supabase as any)
         .from("user_music_preferences")
         .select("activity_type, preferred_tempo_avg, preferred_energy_avg, skip_rate, like_count, session_count")
         .eq("user_id", user.id);
@@ -105,7 +105,8 @@ export function useUserMusicPreferences(activityType?: string) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    await supabase.rpc("upsert_music_preference", {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.rpc as any)("upsert_music_preference", {
       p_user_id:       user.id,
       p_activity_type: type,
       p_tempo:         tempo,

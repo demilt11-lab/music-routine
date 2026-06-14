@@ -98,7 +98,7 @@ export function ConnectionStatusBanner() {
       window.removeEventListener("online", goOnline);
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   // This component renders nothing — all UI is via sonner toasts

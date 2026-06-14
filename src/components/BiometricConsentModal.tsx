@@ -24,7 +24,7 @@ export function BiometricConsentModal({
     setLoading(true);
     setError(null);
     try {
-      const { error: rpcErr } = await supabase.rpc("grant_biometric_consent", {
+      const { error: rpcErr } = await (supabase as any).rpc("grant_biometric_consent", {
         p_user_id: userId,
         p_version: "1.0",
         p_ip_hash: null, // server-side hashing via edge function

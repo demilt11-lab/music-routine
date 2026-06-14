@@ -56,17 +56,17 @@ interface ActiveSessionPanelProps {
   autoPlayQueue: {
     state: {
       isEnabled: boolean;
-      queue: JamendoTrack[];
+      queue: { id: string; title: string; artist: string; tempo: number; energy: number; audioUrl?: string; source: string; reason?: string }[];
     };
     enableAutoPlay: () => void;
     disableAutoPlay: () => void;
-    skipToNext: () => JamendoTrack | null;
-    getCurrentTrack: () => JamendoTrack | null;
-    addToQueue: (tracks: JamendoTrack[]) => void;
+    skipToNext: () => { id: string; title: string; artist: string; tempo: number; energy: number; audioUrl?: string; source: string; reason?: string } | null;
+    getCurrentTrack: () => { id: string; title: string; artist: string; tempo: number; energy: number; audioUrl?: string; source: string; reason?: string } | null;
+    addToQueue: (tracks: { id: string; title: string; artist: string; tempo: number; energy: number; audioUrl?: string; source: string; reason?: string }[]) => void;
   };
   adaptationEvents: AdaptationEvent[];
   trackFeedback: {
-    getFeedback: (trackTitle: string, trackArtist: string) => { feedback: "up" | "down" } | null;
+    getFeedback: (trackTitle: string, trackArtist: string) => "up" | "down" | null;
     submitFeedback: (payload: {
       trackTitle: string;
       trackArtist: string;
@@ -255,8 +255,8 @@ export const ActiveSessionPanel = memo(function ActiveSessionPanel({
               autoPlayQueue.disableAutoPlay();
             }
           }}
-          queue={autoPlayQueue.state.queue}
-          currentQueueTrack={autoPlayQueue.getCurrentTrack()}
+          queue={autoPlayQueue.state.queue as any}
+          currentQueueTrack={autoPlayQueue.getCurrentTrack() as any}
           onSkipNext={() => {
             const nextTrack = autoPlayQueue.skipToNext();
 
@@ -304,7 +304,7 @@ export const ActiveSessionPanel = memo(function ActiveSessionPanel({
           isSessionActive
           onQueueReady={(tracks) => {
             tracks.forEach((track) => {
-              autoPlayQueue.addToQueue([track]);
+              autoPlayQueue.addToQueue([track as any]);
             });
           }}
         />

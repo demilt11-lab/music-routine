@@ -18,7 +18,7 @@ export function useOnboarding() {
         const { data: { user } } = await supabase.auth.getUser();
 
         if (user) {
-          const { data, error } = await supabase
+          const { data, error } = await (supabase as any)
             .from("profiles")
             .select("onboarding_completed")
             .eq("id", user.id)
@@ -54,7 +54,7 @@ export function useOnboarding() {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (user) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("profiles")
           .update({ onboarding_completed: true })
           .eq("id", user.id);
@@ -80,7 +80,7 @@ export function useOnboarding() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        await supabase
+        await (supabase as any)
           .from("profiles")
           .update({ onboarding_completed: false })
           .eq("id", user.id);
