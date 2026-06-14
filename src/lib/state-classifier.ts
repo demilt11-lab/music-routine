@@ -226,5 +226,5 @@ export function passesSpeechinessFilter(
   if (!strictActivities.includes(activityType)) return true;
   if (userOverride) return true;
   if (speechiness === null) return true;
-  return speechiness <= 0.3;
+  return speechiness <= 0.15;
 }

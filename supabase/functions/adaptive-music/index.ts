@@ -1,7 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { ORIGIN } from "../_shared/cors.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': ORIGIN,
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
@@ -41,14 +43,35 @@ serve(async (req) => {
   }
 
   try {
+    // JWT validation — deny unauthenticated callers
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const { 
-      biometricState, 
-      activityType, 
+    const {
+      biometricState,
+      activityType,
       currentSong,
       targetFlowState = "in-flow",
       recentReadings = [],
@@ -73,8 +96,8 @@ serve(async (req) => {
     // Determine what adjustment is needed
     const adjustment = calculateAdjustment(biometricState, targets, trend);
 
-    // Check if EEG data is available
-    const hasEEGData = biometricState.eegAlpha !== undefined;
+    // Check if EEG data is available and trustworthy (skip when confidence is low — fallback mode)
+    const hasEEGData = biometricState.eegAlpha !== undefined && biometricState.confidence !== "low";
     
     const eegSection = hasEEGData ? `
 ## Brainwave Data (EEG):
@@ -209,9 +232,19 @@ Return your response in this exact JSON format:
 
     let recommendation: MusicRecommendation;
     try {
-      const jsonMatch = content?.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        recommendation = JSON.parse(jsonMatch[0]);
+      // Try direct parse first; fall back to extracting a JSON object from prose
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(content ?? "");
+      } catch {
+        // Non-greedy match: find the first complete JSON object (stops at the matching closing brace)
+        const jsonMatch = content?.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
+        if (jsonMatch) {
+          parsed = JSON.parse(jsonMatch[0]);
+        }
+      }
+      if (parsed && typeof parsed === "object" && "action" in (parsed as object)) {
+        recommendation = parsed as MusicRecommendation;
       } else {
         recommendation = generateFallbackRecommendation(biometricState, activityType, targets, adjustment);
       }

@@ -241,7 +241,9 @@ export function passesSpeechinessFilter(
   if (!strictActivities.includes(activityType)) return true;
   if (userOverride) return true;
   if (speechiness === null) return true;
-  return speechiness <= 0.3;
+  // 0.15 threshold based on focus research: values above 0.15 include audible lyrics/speech
+  // that measurably degrade working memory during concentration-heavy activities
+  return speechiness <= 0.15;
 }
 
 // ── HTTP handler ─────────────────────────────────────────────

@@ -184,7 +184,8 @@ Deno.serve(async (req) => {
         } else if (res.status === 410 || res.status === 404) {
           staleIds.push(sub.id);
         } else {
-          console.error("Push failed:", res.status, await res.text());
+          // Log only status — never log endpoint URL (contains subscription-specific path)
+          console.error("Push failed:", res.status);
         }
       } catch (err) {
         console.error("Push send error:", err);
