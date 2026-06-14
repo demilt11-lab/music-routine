@@ -1,7 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+import { ORIGIN } from "../_shared/cors.ts";
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": ORIGIN,
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
@@ -183,7 +184,8 @@ Deno.serve(async (req) => {
         } else if (res.status === 410 || res.status === 404) {
           staleIds.push(sub.id);
         } else {
-          console.error("Push failed:", res.status, await res.text());
+          // Log only status — never log endpoint URL (contains subscription-specific path)
+          console.error("Push failed:", res.status);
         }
       } catch (err) {
         console.error("Push send error:", err);

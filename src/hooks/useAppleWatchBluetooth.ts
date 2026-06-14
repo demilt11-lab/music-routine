@@ -32,6 +32,7 @@ export function useAppleWatchBluetooth(): UseAppleWatchBluetoothReturn {
 
   const serverRef = useRef<any>(null);
   const charRef = useRef<any>(null);
+  const stalenessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isIOSSafari = detectIOSSafari();
   const isSupported = isWebBluetoothSupported();
@@ -43,7 +44,17 @@ export function useAppleWatchBluetooth(): UseAppleWatchBluetoothReturn {
     const flags = value.getUint8(0);
     const is16Bit = flags & 0x01;
     const hr = is16Bit ? value.getUint16(1, true) : value.getUint8(1);
+    if (hr < 35 || hr > 210) {
+      console.warn("[AppleWatchBT] Rejected out-of-range HR reading:", hr);
+      return;
+    }
     setHeartRate(hr);
+
+    // Reset staleness timer — clear HR if stream goes silent for 5s without a disconnect event
+    if (stalenessTimerRef.current) clearTimeout(stalenessTimerRef.current);
+    stalenessTimerRef.current = setTimeout(() => {
+      setHeartRate(null);
+    }, 5000);
   }, []);
 
   const connect = useCallback(async () => {
@@ -100,6 +111,10 @@ export function useAppleWatchBluetooth(): UseAppleWatchBluetoothReturn {
   }, [isSupported, isIOSSafari, handleHRNotification]);
 
   const disconnect = useCallback(() => {
+    if (stalenessTimerRef.current) {
+      clearTimeout(stalenessTimerRef.current);
+      stalenessTimerRef.current = null;
+    }
     if (charRef.current) {
       charRef.current.removeEventListener("characteristicvaluechanged", handleHRNotification);
       try { charRef.current.stopNotifications(); } catch {}

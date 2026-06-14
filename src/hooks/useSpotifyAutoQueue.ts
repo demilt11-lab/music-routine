@@ -13,9 +13,11 @@ export interface SpotifyQueueTrack {
 
 const STORAGE_KEY = "spotify_tokens";
 
+// Read tokens from sessionStorage (tab-scoped) — mirrors useSpotify.ts token store.
+// Never reads localStorage: access tokens must not persist beyond the browser session.
 function getStoredTokens() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = sessionStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -37,7 +39,7 @@ async function getValidToken(): Promise<string | null> {
       refresh_token: data.refresh_token || tokens.refresh_token,
       expires_at: Date.now() + data.expires_in * 1000,
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newTokens));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(newTokens));
     return newTokens.access_token;
   } catch {
     return null;

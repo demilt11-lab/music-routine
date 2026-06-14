@@ -116,7 +116,12 @@ export function useHealthKit(): UseHealthKitReturn {
       });
 
       if (samples && samples.length > 0) {
-        const bpm = Math.round(samples[0].value);
+        const raw = samples[0].value;
+        if (!Number.isFinite(raw) || raw < 35 || raw > 210) {
+          console.warn("[HealthKit] Rejected out-of-range HR reading:", raw);
+          return null;
+        }
+        const bpm = Math.round(raw);
         setState((prev) => ({
           ...prev,
           lastHeartRate: bpm,
@@ -132,6 +137,8 @@ export function useHealthKit(): UseHealthKitReturn {
             heart_rate: bpm,
             device_type: platform === "ios" ? "apple_healthkit" : "health_connect",
             recorded_at: new Date().toISOString(),
+            confidence: "high",
+            signal_quality: 95,
           });
         }
 

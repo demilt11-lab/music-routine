@@ -1,22 +1,29 @@
 project_id = "iygbnnvsojlgztqvcghy"
 
+# generate-playlist reads biometric health data — must be authenticated
 [functions.generate-playlist]
-verify_jwt = false
+verify_jwt = true
 
+# spotify-auth is called from an already-authenticated session
 [functions.spotify-auth]
-verify_jwt = false
+verify_jwt = true
 
+# spotify-callback is the OAuth redirect from Spotify's servers — no JWT available
 [functions.spotify-callback]
 verify_jwt = false
 
+# jamendo-proxy serves public music catalog data — auth not required
 [functions.jamendo-proxy]
 verify_jwt = false
 
+# VAPID public key is not sensitive; used before push subscription is established
 [functions.get-vapid-key]
 verify_jwt = false
 
+# send-push-notification: manual JWT check inside function (supports both user and service-role callers)
 [functions.send-push-notification]
 verify_jwt = false
 
+# weekly-digest is called by pg_cron (no user JWT available)
 [functions.weekly-digest]
 verify_jwt = false

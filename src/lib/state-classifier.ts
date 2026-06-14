@@ -1,6 +1,10 @@
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+/**
+ * Pure biometric state classifier — shared between the Supabase edge function
+ * (supabase/functions/state-classifier/index.ts) and the frontend test suite.
+ *
+ * No Deno or browser globals — pure TypeScript functions only.
+ */
 
-// ── Types ─────────────────────────────────────────────────────
 export type StateClass =
   | "OPTIMAL" | "UNDERPERFORMING" | "OVEREXERTING"
   | "ANXIOUS" | "DISTRACTED" | "DROWSY" | "FATIGUED"
@@ -9,14 +13,14 @@ export type StateClass =
 export interface BiometricWindow {
   hr_mean: number;
   hr_std: number;
-  hr_trend: number;            // slope (BPM/s over 30s window)
+  hr_trend: number;
   hrv_rmssd_mean: number | null;
-  hrmax_estimate: number;      // 220 - age
+  hrmax_estimate: number;
   resting_hr: number;
   respiratory_rate_mean: number | null;
   eda_mean: number | null;
   stress_score_mean: number | null;
-  eeg_alpha_rel: number | null; // relative power 0-1
+  eeg_alpha_rel: number | null;
   eeg_beta_rel: number | null;
   eeg_theta_rel: number | null;
   focus_score_mean: number | null;
@@ -29,7 +33,7 @@ export interface BiometricWindow {
 
 export interface ActivityProfile {
   activity_type: string;
-  hr_min_pct: number;   // % of HRmax
+  hr_min_pct: number;
   hr_max_pct: number;
   hr_optimal_min_pct: number;
   hr_optimal_max_pct: number;
@@ -41,14 +45,12 @@ export interface ActivityProfile {
 
 export interface ClassificationResult {
   state: StateClass;
-  confidence: number;         // 0-1
+  confidence: number;
   key_signals: string[];
   time_in_state: number;
   transition_from: StateClass | null;
 }
 
-// ── Activity Profiles ─────────────────────────────────────────
-// H-1: exported so playlist-engine can import instead of duplicating
 export const ACTIVITY_PROFILES: Record<string, ActivityProfile> = {
   strength_training: {
     activity_type: "strength_training",
@@ -108,14 +110,12 @@ export const ACTIVITY_PROFILES: Record<string, ActivityProfile> = {
   },
 };
 
-// ── Classifier ──────────────────────────────────────────────
 export function classifyBiometricState(
   window: BiometricWindow,
   profile: ActivityProfile,
 ): ClassificationResult {
   const signals: string[] = [];
 
-  // Guard: hrmax_estimate = 0 causes division-by-zero → NaN propagation through all branches
   if (!window.hrmax_estimate || window.hrmax_estimate <= 0 || !Number.isFinite(window.hr_mean)) {
     return {
       state: "OPTIMAL",
@@ -128,16 +128,13 @@ export function classifyBiometricState(
 
   const hrPct = window.hr_mean / window.hrmax_estimate;
 
-  // ── FLOW: gold standard – everything optimal + sustained ──
   const inOptimalHR = hrPct >= profile.hr_optimal_min_pct && hrPct <= profile.hr_optimal_max_pct;
   const hrStable    = window.hr_std < 5;
   const focusHigh   = window.focus_score_mean === null || window.focus_score_mean > 70;
   const alphaOk     = window.eeg_alpha_rel === null || window.eeg_alpha_rel > 0.3;
   const lowStress   = window.stress_score_mean === null || window.stress_score_mean < (profile.stress_max ?? 50);
-  const sustained   = window.time_in_current_state_s >= 600; // 10 min
-  // H-6: hrvHigh is now actively gated in FLOW — removed dead variable, added inline
-  // Use 40 threshold (not 50) to avoid blocking trained athletes with naturally lower acute HRV
-  const hrvOk = window.hrv_rmssd_mean === null || window.hrv_rmssd_mean > 40;
+  const sustained   = window.time_in_current_state_s >= 600;
+  const hrvOk       = window.hrv_rmssd_mean === null || window.hrv_rmssd_mean > 40;
 
   if (inOptimalHR && hrStable && focusHigh && lowStress && alphaOk && hrvOk && sustained) {
     signals.push("HR in optimal range", "stable variability", "HRV adequate", "focus high", "sustained 10+ min");
@@ -145,7 +142,6 @@ export function classifyBiometricState(
              time_in_state: window.time_in_current_state_s, transition_from: window.previous_state };
   }
 
-  // ── ANXIOUS ───────────────────────────────────────────
   const betaHigh   = window.eeg_beta_rel !== null && window.eeg_beta_rel > 0.45;
   const stressHigh = window.stress_score_mean !== null && window.stress_score_mean > (profile.stress_max ?? 50);
   const hrvDrop    = window.hrv_rmssd_mean !== null && window.hrv_rmssd_mean < 30;
@@ -156,16 +152,13 @@ export function classifyBiometricState(
              time_in_state: window.time_in_current_state_s, transition_from: window.previous_state };
   }
 
-  // ── OVEREXERTING ─────────────────────────────────────────
   if (hrPct > profile.hr_max_pct) {
     signals.push(`HR ${(hrPct * 100).toFixed(0)}% > ${(profile.hr_max_pct * 100).toFixed(0)}% max`);
     return { state: "OVEREXERTING", confidence: 0.88, key_signals: signals,
              time_in_state: window.time_in_current_state_s, transition_from: window.previous_state };
   }
 
-  // ── RECOVERING ──────────────────────────────────────────
-  const decliningHR = window.hr_trend < -0.5; // falling > 0.5 BPM/s
-  // H-5: RECOVERING now triggers after both OVEREXERTING and FATIGUED
+  const decliningHR = window.hr_trend < -0.5;
   if (decliningHR && hrPct > 0.55 &&
       (window.previous_state === "OVEREXERTING" || window.previous_state === "FATIGUED")) {
     signals.push("HR declining post-exertion");
@@ -173,7 +166,6 @@ export function classifyBiometricState(
              time_in_state: window.time_in_current_state_s, transition_from: window.previous_state };
   }
 
-  // ── DROWSY ─────────────────────────────────────────────
   const thetaDominant = window.eeg_theta_rel !== null && window.eeg_theta_rel > 0.40;
   const focusLow      = window.focus_score_mean !== null && window.focus_score_mean < 35;
   const hrResting     = hrPct < 0.60;
@@ -183,8 +175,6 @@ export function classifyBiometricState(
              time_in_state: window.time_in_current_state_s, transition_from: window.previous_state };
   }
 
-  // ── DISTRACTED (study + creative context) ───────────────────
-  // M-4: extended from study-only to include creative_work (both rely on sustained focus)
   const thetaRising  = window.eeg_theta_rel !== null && window.eeg_theta_rel > 0.30;
   const focusFalling = window.focus_score_mean !== null && window.focus_score_mean < 45;
   if (["study", "creative_work"].includes(profile.activity_type) && thetaRising && focusFalling) {
@@ -193,7 +183,6 @@ export function classifyBiometricState(
              time_in_state: window.time_in_current_state_s, transition_from: window.previous_state };
   }
 
-  // ── FATIGUED ─────────────────────────────────────────────
   const intensityDrop = window.activity_intensity_mean !== null && window.activity_intensity_mean < 3;
   const hrvFatigue    = window.hrv_rmssd_mean !== null && window.hrv_rmssd_mean < 25;
   if (decliningHR && intensityDrop && hrvFatigue) {
@@ -202,21 +191,18 @@ export function classifyBiometricState(
              time_in_state: window.time_in_current_state_s, transition_from: window.previous_state };
   }
 
-  // ── UNDERPERFORMING ───────────────────────────────────────
   if (hrPct < profile.hr_min_pct) {
     signals.push(`HR ${(hrPct * 100).toFixed(0)}% < ${(profile.hr_min_pct * 100).toFixed(0)}% floor`);
     return { state: "UNDERPERFORMING", confidence: 0.80, key_signals: signals,
              time_in_state: window.time_in_current_state_s, transition_from: window.previous_state };
   }
 
-  // ── OPTIMAL (default) ────────────────────────────────────
   signals.push("all vitals in range");
   const confidence = inOptimalHR && hrStable ? 0.85 : 0.65;
   return { state: "OPTIMAL", confidence, key_signals: signals,
            time_in_state: window.time_in_current_state_s, transition_from: window.previous_state };
 }
 
-// ── BPM Transition Validator ──────────────────────────────────
 export function validateBPMTransition(
   currentBPM: number,
   nextBPM: number,
@@ -231,7 +217,6 @@ export function validateBPMTransition(
   return { allowed: true };
 }
 
-// ── Speechiness Filter ────────────────────────────────────────
 export function passesSpeechinessFilter(
   speechiness: number | null,
   activityType: string,
@@ -241,56 +226,5 @@ export function passesSpeechinessFilter(
   if (!strictActivities.includes(activityType)) return true;
   if (userOverride) return true;
   if (speechiness === null) return true;
-  // 0.15 threshold based on focus research: values above 0.15 include audible lyrics/speech
-  // that measurably degrade working memory during concentration-heavy activities
   return speechiness <= 0.15;
 }
-
-// ── HTTP handler ─────────────────────────────────────────────
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const ORIGIN = Deno.env.get("APP_ORIGIN") ?? "*";
-const CORS = {
-  "Access-Control-Allow-Origin":  ORIGIN,
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type",
-};
-
-const json = (data: unknown, status = 200) =>
-  new Response(JSON.stringify(data), {
-    status,
-    headers: { ...CORS, "Content-Type": "application/json" },
-  });
-
-serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
-
-  // Require valid JWT — classifier processes sensitive biometric data
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) return json({ error: "Unauthorized" }, 401);
-
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_ANON_KEY")!,
-  );
-  const { data: { user }, error: authErr } = await supabase.auth.getUser(
-    authHeader.replace("Bearer ", ""),
-  );
-  if (authErr || !user) return json({ error: "Unauthorized" }, 401);
-
-  try {
-    const body = await req.json();
-    const { window: bioWindow, activity_type } = body;
-
-    if (!bioWindow || typeof bioWindow !== "object") {
-      return json({ error: "Missing or invalid biometric window" }, 400);
-    }
-
-    const profile = ACTIVITY_PROFILES[activity_type ?? "study"] ?? ACTIVITY_PROFILES["study"];
-    const result  = classifyBiometricState(bioWindow, profile);
-
-    return json(result);
-  } catch (err) {
-    return json({ error: String(err) }, 400);
-  }
-});

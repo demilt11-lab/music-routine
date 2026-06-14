@@ -8,8 +8,9 @@ import {
   type StateClass,
 } from "../state-classifier/index.ts";
 
+import { ORIGIN } from "../_shared/cors.ts";
 const CORS_HEADERS = {
-  "Access-Control-Allow-Origin":  Deno.env.get("APP_ORIGIN") ?? "*",
+  "Access-Control-Allow-Origin":  ORIGIN,
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Authorization, Content-Type",
 };
@@ -79,6 +80,11 @@ serve(async (req) => {
       urgency: "LOW" | "MEDIUM" | "HIGH";
     } = body;
 
+    // Validate required fields
+    if (!session_id || typeof session_id !== "string") {
+      return new Response(JSON.stringify({ error: "session_id is required" }), { status: 400, headers: CORS_HEADERS });
+    }
+
     // 1. Classify state
     const ACTIVITY_PROFILES: Record<string, Parameters<typeof classifyBiometricState>[1]> = {
       strength_training: { activity_type: "strength_training", hr_min_pct: 0.70, hr_max_pct: 0.90, hr_optimal_min_pct: 0.75, hr_optimal_max_pct: 0.82, hrv_target: "moderate", eeg_target: "beta", focus_threshold: null, stress_max: 60 },
@@ -89,6 +95,13 @@ serve(async (req) => {
       creative_work: { activity_type: "creative_work", hr_min_pct: 0, hr_max_pct: 1, hr_optimal_min_pct: 0, hr_optimal_max_pct: 1, hrv_target: "high", eeg_target: "alpha_theta", focus_threshold: 50, stress_max: 40 },
       recovery:  { activity_type: "recovery",  hr_min_pct: 0, hr_max_pct: 0.65, hr_optimal_min_pct: 0, hr_optimal_max_pct: 0.60, hrv_target: "high", eeg_target: null, focus_threshold: null, stress_max: 30 },
     };
+    const VALID_ACTIVITIES = Object.keys(ACTIVITY_PROFILES);
+    if (activity_type && !VALID_ACTIVITIES.includes(activity_type)) {
+      return new Response(
+        JSON.stringify({ error: `Invalid activity_type. Must be one of: ${VALID_ACTIVITIES.join(", ")}` }),
+        { status: 400, headers: CORS_HEADERS },
+      );
+    }
     const profile = ACTIVITY_PROFILES[activity_type] ?? ACTIVITY_PROFILES["study"];
     const classification = classifyBiometricState(biometric_window, profile);
     const direction      = stateToDirection(classification.state);

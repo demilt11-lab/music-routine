@@ -17,24 +17,16 @@ export default defineConfig(({ mode }) => ({
       disable: mode === "development",
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "app-icon.png", "splash.png"],
-      workbox: {
-        navigateFallback: null,
-        navigateFallbackDenylist: [/^\/~oauth/],
+      // injectManifest: Workbox injects the precache asset list into our custom sw.js
+      // instead of generating a new SW that would overwrite (and conflict with) public/sw.js.
+      // This preserves our push-notification security, same-origin URL validation,
+      // and stale-while-revalidate caching strategy implemented in public/sw.js.
+      strategies: "injectManifest",
+      srcDir: "public",
+      filename: "sw.js",
+      injectManifest: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,jpg,webp,woff,woff2}"],
-        additionalManifestEntries: [],
-        importScripts: ["/sw.js"],
-        runtimeCaching: [
-          {
-            urlPattern: ({ request }) => request.mode === "navigate",
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "pages",
-              networkTimeoutSeconds: 5,
-            },
-          },
-        ],
       },
-      strategies: "generateSW",
       manifest: {
         name: "BioMusic",
         short_name: "BioMusic",

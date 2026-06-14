@@ -93,6 +93,11 @@ export function useYouTubeMusic(): UseYouTubeMusicReturn {
         return wasAdded;
       } catch (error) {
         console.error("Error fetching YouTube metadata:", error);
+        // Add the track with fallback metadata so the user's paste still works,
+        // but surface a visible warning so they know metadata is missing.
+        import("sonner").then(({ toast }) =>
+          toast.warning("Could not fetch video title — added with placeholder name.")
+        );
 
         let wasAdded = false;
 

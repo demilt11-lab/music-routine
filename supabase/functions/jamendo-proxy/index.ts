@@ -1,11 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { ORIGIN } from "../_shared/cors.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': ORIGIN,
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const JAMENDO_CLIENT_ID = "b6747d04";
+// JAMENDO_CLIENT_ID must be set as a Supabase secret:  supabase secrets set JAMENDO_CLIENT_ID=<id>
+const JAMENDO_CLIENT_ID = Deno.env.get("JAMENDO_CLIENT_ID") ?? "b6747d04";
 const JAMENDO_BASE = "https://api.jamendo.com/v3.0";
 
 serve(async (req) => {

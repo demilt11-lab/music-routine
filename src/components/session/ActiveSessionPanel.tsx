@@ -18,6 +18,7 @@ import { AdaptiveMusicPanel } from "./AdaptiveMusicPanel";
 import { LiveAdaptationFeed, type AdaptationEvent } from "./LiveAdaptationFeed";
 import { PredictiveQueueBuilder } from "./PredictiveQueueBuilder";
 import { BiometricMusicMapper } from "./BiometricMusicMapper";
+import { type JamendoTrack } from "@/hooks/useJamendo";
 
 interface ActiveSessionPanelProps {
   selectedActivityName?: string;
@@ -38,9 +39,9 @@ interface ActiveSessionPanelProps {
     } | null;
     isPlaying: boolean;
     togglePlay: () => Promise<void> | void;
-    play: (track: any) => Promise<void> | void;
+    play: (track: JamendoTrack) => Promise<void> | void;
     loadByMood: (mood: string) => Promise<void> | void;
-    tracks: Array<{ audio: string } & any>;
+    tracks: JamendoTrack[];
     audioRef: React.RefObject<HTMLAudioElement>;
   };
   adaptiveMusicState: {
@@ -55,17 +56,17 @@ interface ActiveSessionPanelProps {
   autoPlayQueue: {
     state: {
       isEnabled: boolean;
-      queue: any[];
+      queue: JamendoTrack[];
     };
     enableAutoPlay: () => void;
     disableAutoPlay: () => void;
-    skipToNext: () => any;
-    getCurrentTrack: () => any;
-    addToQueue: (tracks: any[]) => void;
+    skipToNext: () => JamendoTrack | null;
+    getCurrentTrack: () => JamendoTrack | null;
+    addToQueue: (tracks: JamendoTrack[]) => void;
   };
   adaptationEvents: AdaptationEvent[];
   trackFeedback: {
-    getFeedback: (trackTitle: string, trackArtist: string) => any;
+    getFeedback: (trackTitle: string, trackArtist: string) => { feedback: "up" | "down" } | null;
     submitFeedback: (payload: {
       trackTitle: string;
       trackArtist: string;

@@ -52,34 +52,48 @@ const SPOTIFY_SDK_SRC = "https://sdk.scdn.co/spotify-player.js";
 // FIX BUG-004: null on rejection so callers can retry
 let spotifySdkPromise: Promise<void> | null = null;
 
-function canUseStorage() {
+// ── Secure token store ────────────────────────────────────────────────────
+// Primary: in-memory singleton (XSS cannot steal what is not persisted to DOM)
+// Fallback: sessionStorage (tab-scoped, cleared on close — much shorter exposure
+//   window than localStorage; still mitigates cross-tab token theft)
+// Intentionally NOT using localStorage to reduce XSS token theft risk.
+let _memoryTokens: SpotifyTokens | null = null;
+
+function canUseSessionStorage() {
   try {
-    return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+    return typeof window !== "undefined" && typeof window.sessionStorage !== "undefined";
   } catch {
     return false;
   }
 }
 
 function getStoredTokens(): SpotifyTokens | null {
-  if (!canUseStorage()) return null;
+  if (_memoryTokens) return _memoryTokens;
+  if (!canUseSessionStorage()) return null;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as SpotifyTokens) : null;
+    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as SpotifyTokens) : null;
+    if (parsed) _memoryTokens = parsed;
+    return parsed;
   } catch {
     return null;
   }
 }
 
 function storeTokens(tokens: SpotifyTokens) {
-  if (!canUseStorage()) return;
+  _memoryTokens = tokens;
+  if (!canUseSessionStorage()) return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tokens));
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(tokens));
   } catch {}
 }
 
 function clearTokens() {
-  if (!canUseStorage()) return;
+  _memoryTokens = null;
+  if (!canUseSessionStorage()) return;
   try {
+    window.sessionStorage.removeItem(STORAGE_KEY);
+    // Also clear legacy localStorage entry if present from previous sessions
     window.localStorage.removeItem(STORAGE_KEY);
   } catch {}
 }
@@ -584,16 +598,22 @@ export function useSpotify(
   }, [exchangeCode]);
 
   useEffect(() => {
-    if (!canUseStorage()) return;
+    // Cross-tab token sync: tokens now live in sessionStorage (tab-scoped) so
+    // this event will only fire in the rare case of a same-origin popout OAuth flow.
+    if (!canUseSessionStorage()) return;
     const handler = (e: StorageEvent) => {
       if (e.key !== STORAGE_KEY || !e.newValue) return;
       try {
         const tokens = JSON.parse(e.newValue) as SpotifyTokens;
         if (tokens.access_token && Date.now() < tokens.expires_at) {
+          _memoryTokens = tokens;
           setIsConnected(true);
           toast.success("Connected to Spotify!");
         }
-      } catch {}
+      } catch (err) {
+        console.warn("[Spotify] Failed to sync token from storage event:", err);
+        toast.error("Spotify session could not be synced. Please reconnect.");
+      }
     };
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);

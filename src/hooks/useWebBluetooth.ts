@@ -111,6 +111,7 @@ export function useWebBluetooth(): UseWebBluetoothReturn {
   const heartRateCallback = useRef<((heartRate: number) => void) | null>(null);
   const characteristicRef = useRef<any>(null);
   const reconnectAttempts = useRef(0);
+  const stalenessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const maxReconnectAttempts = 3;
 
   // Bluetooth availability listener
@@ -152,9 +153,17 @@ export function useWebBluetooth(): UseWebBluetoothReturn {
     const value = target?.value;
     if (value) {
       const heartRate = parseHeartRate(value);
-      if (heartRate > 0) {
+      if (heartRate >= 35 && heartRate <= 210) {
         setState((prev) => ({ ...prev, lastHeartRate: heartRate }));
         heartRateCallback.current?.(heartRate);
+
+        // Reset staleness timer — clear HR if stream goes silent for 5s without a disconnect event
+        if (stalenessTimerRef.current) clearTimeout(stalenessTimerRef.current);
+        stalenessTimerRef.current = setTimeout(() => {
+          setState((prev) => ({ ...prev, lastHeartRate: null }));
+        }, 5000);
+      } else if (heartRate !== 0) {
+        console.warn("[WebBluetooth] Rejected out-of-range HR reading:", heartRate);
       }
     }
   }, []);
@@ -332,6 +341,11 @@ export function useWebBluetooth(): UseWebBluetoothReturn {
 
   const disconnect = useCallback(() => {
     reconnectAttempts.current = maxReconnectAttempts; // prevent auto-reconnect
+
+    if (stalenessTimerRef.current) {
+      clearTimeout(stalenessTimerRef.current);
+      stalenessTimerRef.current = null;
+    }
 
     if (characteristicRef.current) {
       characteristicRef.current.removeEventListener("characteristicvaluechanged", handleHeartRateNotification);

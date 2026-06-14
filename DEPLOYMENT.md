@@ -9,7 +9,7 @@ Use this checklist before every production release.
 ### Credentials & Secrets
 - [ ] Rotate Supabase anon key (if previously exposed) and update in hosting env vars
 - [ ] Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in Vercel / Netlify / Lovable environment settings — not in the repo
-- [ ] Set `SPOTIFY_CLIENT_SECRET`, `VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY` as Supabase Edge Function secrets
+- [ ] Set `SPOTIFY_CLIENT_SECRET`, `VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`, `JAMENDO_CLIENT_ID`, `APP_ORIGIN` as Supabase Edge Function secrets (`supabase secrets set KEY=value`)
 - [ ] Verify `.env` is NOT tracked by git (`git ls-files .env` should return nothing)
 
 ### Database
