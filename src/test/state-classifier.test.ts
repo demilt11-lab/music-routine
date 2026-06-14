@@ -320,16 +320,16 @@ describe("passesSpeechinessFilter", () => {
     expect(passesSpeechinessFilter(0.6, "study")).toBe(false);
   });
 
-  it("allows low-speechiness track (0.2) for study", () => {
-    expect(passesSpeechinessFilter(0.2, "study")).toBe(true);
+  it("allows low-speechiness track (0.1) for study", () => {
+    expect(passesSpeechinessFilter(0.1, "study")).toBe(true);
   });
 
-  it("boundary: 0.3 speechiness is allowed for study (≤ 0.3)", () => {
-    expect(passesSpeechinessFilter(0.3, "study")).toBe(true);
+  it("boundary: 0.15 speechiness is allowed for study (≤ 0.15)", () => {
+    expect(passesSpeechinessFilter(0.15, "study")).toBe(true);
   });
 
-  it("boundary: 0.31 speechiness is blocked for study", () => {
-    expect(passesSpeechinessFilter(0.31, "study")).toBe(false);
+  it("boundary: 0.16 speechiness is blocked for study", () => {
+    expect(passesSpeechinessFilter(0.16, "study")).toBe(false);
   });
 
   it("allows any speechiness for cardio (not a strict activity)", () => {
