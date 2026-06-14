@@ -29,7 +29,7 @@ interface PredictiveQueueBuilderProps {
     heartRate: number;
   };
   goalFlowScore?: number;
-  onQueueReady?: (tracks: JamendoTrack[]) => void;
+  onQueueReady?: (tracks: { id: string; title: string; artist: string; tempo: number; energy: number; audioUrl?: string; source: string; reason?: string; segment?: number }[]) => void;
   isSessionActive?: boolean;
 }
 

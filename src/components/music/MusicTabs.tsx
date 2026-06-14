@@ -181,7 +181,7 @@ const MusicTabsInner = forwardRef<HTMLDivElement>(function MusicTabsInner(_, ref
           ))}
         </TabsList>
 
-        <TabsContent value="spotify" forceMount={activeTab === "spotify"} className="mt-4">
+        <TabsContent value="spotify" forceMount={(activeTab === "spotify") as true} className="mt-4">
           {activeTab === "spotify" ? (
             <Suspense fallback={<TabFallback />}>
               <SpotifyPlayer
@@ -202,7 +202,7 @@ const MusicTabsInner = forwardRef<HTMLDivElement>(function MusicTabsInner(_, ref
           ) : null}
         </TabsContent>
 
-        <TabsContent value="jamendo" forceMount={activeTab === "jamendo"} className="mt-4">
+        <TabsContent value="jamendo" forceMount={(activeTab === "jamendo") as true} className="mt-4">
           {activeTab === "jamendo" ? (
             <Suspense fallback={<TabFallback />}>
               <JamendoExplorer
@@ -222,7 +222,7 @@ const MusicTabsInner = forwardRef<HTMLDivElement>(function MusicTabsInner(_, ref
           ) : null}
         </TabsContent>
 
-        <TabsContent value="local" forceMount={activeTab === "local"} className="mt-4">
+        <TabsContent value="local" forceMount={(activeTab === "local") as true} className="mt-4">
           {activeTab === "local" ? (
             <Suspense fallback={<TabFallback />}>
               <LocalMusicUpload
@@ -239,7 +239,7 @@ const MusicTabsInner = forwardRef<HTMLDivElement>(function MusicTabsInner(_, ref
           ) : null}
         </TabsContent>
 
-        <TabsContent value="youtube" forceMount={activeTab === "youtube"} className="mt-4">
+        <TabsContent value="youtube" forceMount={(activeTab === "youtube") as true} className="mt-4">
           {activeTab === "youtube" ? (
             <Suspense fallback={<TabFallback />}>
               <YouTubeMusicPlayer

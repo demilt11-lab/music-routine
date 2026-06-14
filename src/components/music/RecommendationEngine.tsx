@@ -227,7 +227,7 @@ export const RecommendationEngine = forwardRef<HTMLDivElement>((_, ref) => {
       const activityMap = new Map<string, {
         activityName: string;
         sessions: typeof sessions;
-        songs: Array<{ id: string; title: string; artist: string; tempo: number | null; energy: number | null; flowScore?: number }>;
+        songs: Array<{ id: string; title: string; artist: string; tempo: number | null; energy: number | null; flowScore?: number; valence?: number | null; danceability?: number | null }>;
         flowScores: number[];
       }>();
 
@@ -335,7 +335,7 @@ export const RecommendationEngine = forwardRef<HTMLDivElement>((_, ref) => {
     setIsLoadingRecommendations(true);
 
     try {
-      let { tempo, energy } = profile.characteristics;
+      const { tempo, energy } = profile.characteristics;
       
       // Apply biometric adjustments if real-time mode is enabled
       let adjustedTempo = tempo.optimal;

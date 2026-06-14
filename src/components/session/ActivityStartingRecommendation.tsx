@@ -325,3 +325,37 @@ export const ActiveSessionPanel = memo(function ActiveSessionPanel({
     </div>
   );
 });
+
+import type { StartingSongRecommendation } from "@/hooks/useActivityStartingSong";
+
+interface ActivityStartingRecommendationProps {
+  recommendation: StartingSongRecommendation;
+  isLoading: boolean;
+  activityName: string;
+}
+
+export function ActivityStartingRecommendation({ recommendation, isLoading, activityName }: ActivityStartingRecommendationProps) {
+  if (isLoading) {
+    return (
+      <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground animate-pulse">
+        Finding your ideal starting track for {activityName}…
+      </div>
+    );
+  }
+
+  if (!recommendation.hasHistory || recommendation.topSongs.length === 0) {
+    return null;
+  }
+
+  const top = recommendation.topSongs[0];
+  return (
+    <div className="rounded-lg border bg-card p-4 flex items-center gap-3">
+      <Music className="h-5 w-5 shrink-0 text-primary" />
+      <div className="min-w-0">
+        <p className="text-xs text-muted-foreground">Recommended starting track</p>
+        <p className="font-medium truncate">{top.title}</p>
+        <p className="text-sm text-muted-foreground truncate">{top.artist}</p>
+      </div>
+    </div>
+  );
+}

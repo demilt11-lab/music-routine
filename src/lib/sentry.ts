@@ -11,6 +11,7 @@ export async function initialiseSentry(): Promise<void> {
   if (!dsn || sentryInitialised) return;
 
   try {
+    // @ts-expect-error — optional dependency, absent until VITE_SENTRY_DSN is configured
     const Sentry = await import('@sentry/react');
     Sentry.init({
       dsn,

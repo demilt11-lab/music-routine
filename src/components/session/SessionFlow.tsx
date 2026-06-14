@@ -216,7 +216,7 @@ const syncSessionBuffersToState = useCallback(() => {
           if (next > 0 && next % 300 === 0 && next !== sessionMilestoneRef.current) {
             sessionMilestoneRef.current = next;
             const minutes = next / 60;
-            flowNotificationsRef.current.triggerFlowMilestone?.(minutes);
+            flowNotificationsRef.current.notifySessionMilestone?.(minutes);
           }
           return next;
         });

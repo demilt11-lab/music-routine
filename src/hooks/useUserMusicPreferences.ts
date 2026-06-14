@@ -105,7 +105,8 @@ export function useUserMusicPreferences(activityType?: string) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    await supabase.rpc("upsert_music_preference", {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.rpc as any)("upsert_music_preference", {
       p_user_id:       user.id,
       p_activity_type: type,
       p_tempo:         tempo,
