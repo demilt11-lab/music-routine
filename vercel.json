@@ -1,4 +1,6 @@
 {
+  "installCommand": "npm install -g bun && bun install",
+  "buildCommand": "bun run build",
   "rewrites": [
     { "source": "/((?!api/.*).*)", "destination": "/index.html" }
   ],
