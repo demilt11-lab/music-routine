@@ -4,27 +4,47 @@ on:
   push:
     branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
+  schedule:
+    # Weekly on Monday 03:00 UTC — catches CVEs disclosed after last push
+    - cron: "0 3 * * 1"
 
 jobs:
   gitleaks:
     name: Secret Scan (Gitleaks)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write  # required to upload SARIF results
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c3  # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   dependency-audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe  # v2.0.1
         with:
-          node-version: '20'
-      - run: npm ci
-      - run: npm audit --audit-level=high
+          bun-version: "1"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # npm audit reads package.json and node_modules — works in Bun projects.
+      # We generate a package-lock.json (no install, metadata only) so npm audit
+      # has the lock file it requires without duplicating the install.
+      - name: Generate package-lock for audit
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
