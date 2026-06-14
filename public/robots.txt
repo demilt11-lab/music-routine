@@ -1,14 +1,55 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
+# BioMusic robots.txt
+# Public marketing pages are crawlable; authenticated app paths are not.
 
 User-agent: *
-Allow: /
+Allow: /$
+Allow: /install
+Allow: /app
+
+# Block all authenticated app paths — these require login and contain user data
+Disallow: /dashboard
+Disallow: /session-history
+Disallow: /settings
+Disallow: /weekly-insights
+Disallow: /monthly-progress
+Disallow: /track-feedback
+Disallow: /auth
+Disallow: /auth/callback
+Disallow: /spotify-callback
+
+# Block service worker and API paths
+Disallow: /sw.js
+Disallow: /api/
+
+# Social crawlers — allow public pages only
+User-agent: Twitterbot
+Allow: /$
+Allow: /install
+Allow: /app
+Disallow: /
+
+User-agent: facebookexternalhit
+Allow: /$
+Allow: /install
+Allow: /app
+Disallow: /
+
+User-agent: Googlebot
+Allow: /$
+Allow: /install
+Allow: /app
+Disallow: /dashboard
+Disallow: /session-history
+Disallow: /settings
+Disallow: /weekly-insights
+Disallow: /monthly-progress
+Disallow: /track-feedback
+Disallow: /auth
+
+User-agent: Bingbot
+Allow: /$
+Allow: /install
+Allow: /app
+Disallow: /dashboard
+Disallow: /session-history
+Disallow: /settings
