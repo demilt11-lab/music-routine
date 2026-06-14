@@ -6,11 +6,11 @@ const CACHE_VERSION = "biomusic-v3";
 const CACHE_NAME = CACHE_VERSION;
 
 // ── Precache manifest ─────────────────────────────────────────────────────────
-// vite-plugin-pwa (injectManifest strategy) replaces self.__WB_MANIFEST at build
+// vite-plugin-pwa injectManifest strategy injects the precache manifest at build time
 // time with the full list of versioned assets to precache. Falls back to [] in
 // development (where VitePWA is disabled and this file is served as-is).
 // eslint-disable-next-line no-undef
-const WB_MANIFEST = (typeof self.__WB_MANIFEST !== "undefined" ? self.__WB_MANIFEST : []);
+const WB_MANIFEST = self.__WB_MANIFEST || [];
 
 const hostname = self.location.hostname;
 
