@@ -315,7 +315,7 @@ function calculateHourPatterns(sessions: any[], biometrics: any[]): HourPattern[
 
   return Array.from(hourData.entries()).map(([hour, data]) => {
     const avgFlowScore = data.biometrics.length > 0
-      ? data.biometrics.reduce((sum, b) => sum + (b.focus_score || 0), 0) / data.biometrics.length
+      ? data.biometrics.reduce((sum, b) => sum + ((b.focus_score || 0) * 0.6 + (b.relaxation_score || 0) * 0.4 - (b.stress_level || 0) * 0.2), 0) / data.biometrics.length
       : 0;
 
     const avgFocusScore = data.biometrics.length > 0

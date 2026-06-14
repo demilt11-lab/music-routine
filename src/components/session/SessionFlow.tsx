@@ -209,50 +209,21 @@ const syncSessionBuffersToState = useCallback(() => {
   // Timer for active session with milestone notifications
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
-    if {step === "active" && (
-  <ActiveSessionPanel
-    selectedActivityName={selectedActivity?.name}
-    elapsedTime={elapsedTime}
-    flowState={biometricState.flowState}
-    currentReading={{
-      heartRate: biometricState.currentReading?.heartRate,
-      stressLevel: biometricState.currentReading?.stressLevel,
-      focusScore: biometricState.currentReading?.focusScore,
-      relaxationScore: biometricState.currentReading?.relaxationScore,
-    }}
-    readingCount={biometricState.readings.length}
-    jamendo={{
-      currentTrack: jamendo.currentTrack,
-      isPlaying: jamendo.isPlaying,
-      togglePlay: jamendo.togglePlay,
-      play: jamendo.play,
-      loadByMood: jamendo.loadByMood,
-      tracks: jamendo.tracks,
-      audioRef: jamendo.audioRef,
-    }}
-    adaptiveMusicState={{
-      isEnabled: adaptiveMusic.state.isEnabled,
-      currentRecommendation: adaptiveMusic.state.currentRecommendation,
-    }}
-    autoPlayQueue={{
-      state: autoPlayQueue.state,
-      enableAutoPlay: autoPlayQueue.enableAutoPlay,
-      disableAutoPlay: autoPlayQueue.disableAutoPlay,
-      skipToNext: autoPlayQueue.skipToNext,
-      getCurrentTrack: autoPlayQueue.getCurrentTrack,
-      addToQueue: autoPlayQueue.addToQueue,
-    }}
-    adaptationEvents={adaptationEvents}
-    trackFeedback={{
-      getFeedback: trackFeedback.getFeedback,
-      submitFeedback: trackFeedback.submitFeedback,
-    }}
-    onEndSession={handleEndSession}
-    onResetRecommendationDedup={() => {
-      lastRecommendationRef.current = null;
-    }}
-  />
-)}
+    if (step === "active") {
+      interval = setInterval(() => {
+        setElapsedTime((t) => {
+          const next = t + 1;
+          if (next > 0 && next % 300 === 0 && next !== sessionMilestoneRef.current) {
+            sessionMilestoneRef.current = next;
+            const minutes = next / 60;
+            flowNotificationsRef.current.triggerFlowMilestone?.(minutes);
+          }
+          return next;
+        });
+      }, 1000);
+    }
+    return () => { if (interval) clearInterval(interval); };
+  }, [step]);
 
   // Auto-play: Handle track ending and queue next song
   useEffect(() => {

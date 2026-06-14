@@ -49,7 +49,8 @@ export function useUserSessions(userId: string | undefined) {
         .from("listening_sessions")
         .select("id, name, started_at, ended_at, mood_before, mood_after, activity_type_id")
         .eq("user_id", userId!)
-        .order("started_at", { ascending: false });
+        .order("started_at", { ascending: false })
+        .limit(200);
       if (error) throw error;
       return data;
     },
@@ -176,7 +177,8 @@ export function useSessionsDetailed(userId: string | undefined) {
           )
         `)
         .eq("user_id", userId!)
-        .order("started_at", { ascending: false });
+        .order("started_at", { ascending: false })
+        .limit(100);
       if (error) throw error;
       return data;
     },
