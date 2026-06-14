@@ -43,6 +43,10 @@ export function useAppleWatchBluetooth(): UseAppleWatchBluetoothReturn {
     const flags = value.getUint8(0);
     const is16Bit = flags & 0x01;
     const hr = is16Bit ? value.getUint16(1, true) : value.getUint8(1);
+    if (hr < 35 || hr > 210) {
+      console.warn("[AppleWatchBT] Rejected out-of-range HR reading:", hr);
+      return;
+    }
     setHeartRate(hr);
   }, []);
 

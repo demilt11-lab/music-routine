@@ -152,9 +152,11 @@ export function useWebBluetooth(): UseWebBluetoothReturn {
     const value = target?.value;
     if (value) {
       const heartRate = parseHeartRate(value);
-      if (heartRate > 0) {
+      if (heartRate >= 35 && heartRate <= 210) {
         setState((prev) => ({ ...prev, lastHeartRate: heartRate }));
         heartRateCallback.current?.(heartRate);
+      } else if (heartRate !== 0) {
+        console.warn("[WebBluetooth] Rejected out-of-range HR reading:", heartRate);
       }
     }
   }, []);

@@ -116,7 +116,12 @@ export function useHealthKit(): UseHealthKitReturn {
       });
 
       if (samples && samples.length > 0) {
-        const bpm = Math.round(samples[0].value);
+        const raw = samples[0].value;
+        if (!Number.isFinite(raw) || raw < 35 || raw > 210) {
+          console.warn("[HealthKit] Rejected out-of-range HR reading:", raw);
+          return null;
+        }
+        const bpm = Math.round(raw);
         setState((prev) => ({
           ...prev,
           lastHeartRate: bpm,

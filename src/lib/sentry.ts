@@ -18,11 +18,17 @@ export async function initialiseSentry(): Promise<void> {
       release: import.meta.env.VITE_APP_VERSION as string | undefined,
       // Only trace a sample of transactions to stay within free-tier limits
       tracesSampleRate: import.meta.env.MODE === 'production' ? 0.1 : 0,
-      // Replays only in production, 10% of sessions, 100% on error
+      // Replays only in production, 10% of sessions, 100% on error.
+      // maskAllText + blockAllMedia required: UI renders PHI (heart rate, EEG, stress scores).
       replaysSessionSampleRate: 0.1,
       replaysOnErrorSampleRate: 1.0,
       integrations: [
         Sentry.browserTracingIntegration(),
+        Sentry.replayIntegration({
+          maskAllText: true,
+          blockAllMedia: true,
+          maskAllInputs: true,
+        }),
       ],
       // Do not capture errors from known noisy sources
       ignoreErrors: [
