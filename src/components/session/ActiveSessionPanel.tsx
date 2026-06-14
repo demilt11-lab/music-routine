@@ -255,8 +255,8 @@ export const ActiveSessionPanel = memo(function ActiveSessionPanel({
               autoPlayQueue.disableAutoPlay();
             }
           }}
-          queue={autoPlayQueue.state.queue}
-          currentQueueTrack={autoPlayQueue.getCurrentTrack()}
+          queue={autoPlayQueue.state.queue as any}
+          currentQueueTrack={autoPlayQueue.getCurrentTrack() as any}
           onSkipNext={() => {
             const nextTrack = autoPlayQueue.skipToNext();
 
@@ -304,7 +304,7 @@ export const ActiveSessionPanel = memo(function ActiveSessionPanel({
           isSessionActive
           onQueueReady={(tracks) => {
             tracks.forEach((track) => {
-              autoPlayQueue.addToQueue([track]);
+              autoPlayQueue.addToQueue([track as any]);
             });
           }}
         />

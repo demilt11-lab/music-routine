@@ -118,7 +118,7 @@ export function useActivityStartingSong(): UseActivityStartingSongReturn {
       // Get top played songs (non-skipped, longest play time)
       type SongRow = { id: string; title: string; artist: string; tempo: number | null; energy: number | null };
       const songEntries = (songsResult.data || [])
-        .filter((ss): ss is { songs: SongRow } => !!ss.songs)
+        .filter((ss): ss is typeof ss & { songs: SongRow } => !!ss.songs)
         .map((ss) => ss.songs);
 
       // Deduplicate by song id, keep first occurrence (highest play duration)

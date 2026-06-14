@@ -216,7 +216,7 @@ const syncSessionBuffersToState = useCallback(() => {
           if (next > 0 && next % 300 === 0 && next !== sessionMilestoneRef.current) {
             sessionMilestoneRef.current = next;
             const minutes = next / 60;
-            flowNotificationsRef.current.notifySessionMilestone?.(minutes);
+            flowNotificationsRef.current.notifySessionMilestone?.(String(minutes));
           }
           return next;
         });
@@ -390,7 +390,7 @@ const syncSessionBuffersToState = useCallback(() => {
   // Sync user preferences into adaptive music engine
   useEffect(() => {
     if (trackFeedback.summary) {
-      adaptiveMusic.setUserPreferences(trackFeedback.summary);
+      adaptiveMusic.setUserPreferences(trackFeedback.summary as any);
     }
   }, [trackFeedback.summary, adaptiveMusic]);
 
@@ -1015,7 +1015,7 @@ const syncSessionBuffersToState = useCallback(() => {
                 isSessionActive={step === "active"}
                 onQueueReady={(tracks) => {
                   tracks.forEach(track => {
-                    autoPlayQueue.addToQueue([track]);
+                    autoPlayQueue.addToQueue([track as any]);
                   });
                 }}
               />

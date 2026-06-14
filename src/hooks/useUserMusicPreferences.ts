@@ -29,7 +29,7 @@ export function useUserMusicPreferences(activityType?: string) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const query = supabase
+      const query = (supabase as any)
         .from("user_music_preferences")
         .select("activity_type, preferred_tempo_avg, preferred_energy_avg, skip_rate, like_count, session_count")
         .eq("user_id", user.id);
