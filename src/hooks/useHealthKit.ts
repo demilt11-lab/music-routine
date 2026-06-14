@@ -137,6 +137,8 @@ export function useHealthKit(): UseHealthKitReturn {
             heart_rate: bpm,
             device_type: platform === "ios" ? "apple_healthkit" : "health_connect",
             recorded_at: new Date().toISOString(),
+            confidence: "high",
+            signal_quality: 95,
           });
         }
 

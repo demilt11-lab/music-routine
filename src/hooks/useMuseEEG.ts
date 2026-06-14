@@ -132,6 +132,25 @@ export function useMuseEEG(): UseMuseEEGReturn {
     return { focus, relaxation, meditation };
   }, []);
 
+  // Derive signal quality from cross-channel amplitude consistency.
+  // If any channel RMS is < 1µV (flat/disconnected) or > 150µV (saturated/artifact),
+  // degrade quality accordingly.
+  const assessSignalQuality = useCallback((buffers: number[][]): MuseDevice["signalQuality"] => {
+    const rmsList = buffers.map((ch) => {
+      if (ch.length < 32) return null;
+      const recent = ch.slice(-64);
+      const mean = recent.reduce((a, b) => a + b, 0) / recent.length;
+      return Math.sqrt(recent.reduce((a, b) => a + (b - mean) ** 2, 0) / recent.length);
+    }).filter((v): v is number => v !== null);
+
+    if (rmsList.length === 0) return "unknown";
+    const saturated = rmsList.filter(r => r > 150).length;
+    const flat = rmsList.filter(r => r < 1).length;
+    if (saturated > 1 || flat > 1) return "poor";
+    if (saturated > 0 || flat > 0) return "medium";
+    return "good";
+  }, []);
+
   // Process EEG data from raw samples
   const processEEGData = useCallback(() => {
     const buffers = eegBufferRef.current;
@@ -139,7 +158,7 @@ export function useMuseEEG(): UseMuseEEGReturn {
 
     // Average power across all channels
     const channelPowers = buffers.map(samples => calculateBandPower(samples));
-    
+
     const avgPower = {
       delta: channelPowers.reduce((a, c) => a + c.delta, 0) / 4,
       theta: channelPowers.reduce((a, c) => a + c.theta, 0) / 4,
@@ -158,6 +177,7 @@ export function useMuseEEG(): UseMuseEEGReturn {
     };
 
     const metrics = calculateMetrics(reading);
+    const signalQuality = assessSignalQuality(buffers);
 
     setState(prev => ({
       ...prev,
@@ -165,6 +185,7 @@ export function useMuseEEG(): UseMuseEEGReturn {
       focusScore: Math.round(metrics.focus),
       relaxationScore: Math.round(metrics.relaxation),
       meditationScore: Math.round(metrics.meditation),
+      device: prev.device ? { ...prev.device, signalQuality } : prev.device,
     }));
 
     if (eegCallbackRef.current) {
@@ -175,7 +196,7 @@ export function useMuseEEG(): UseMuseEEGReturn {
     buffers.forEach(b => {
       if (b.length > 512) b.splice(0, 256);
     });
-  }, [calculateBandPower, calculateMetrics]);
+  }, [calculateBandPower, calculateMetrics, assessSignalQuality]);
 
   // Parse Muse EEG packet
   const parseEEGPacket = (dataView: DataView, channelIndex: number) => {

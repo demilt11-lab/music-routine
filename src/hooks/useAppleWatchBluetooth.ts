@@ -32,6 +32,7 @@ export function useAppleWatchBluetooth(): UseAppleWatchBluetoothReturn {
 
   const serverRef = useRef<any>(null);
   const charRef = useRef<any>(null);
+  const stalenessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isIOSSafari = detectIOSSafari();
   const isSupported = isWebBluetoothSupported();
@@ -48,6 +49,12 @@ export function useAppleWatchBluetooth(): UseAppleWatchBluetoothReturn {
       return;
     }
     setHeartRate(hr);
+
+    // Reset staleness timer — clear HR if stream goes silent for 5s without a disconnect event
+    if (stalenessTimerRef.current) clearTimeout(stalenessTimerRef.current);
+    stalenessTimerRef.current = setTimeout(() => {
+      setHeartRate(null);
+    }, 5000);
   }, []);
 
   const connect = useCallback(async () => {
@@ -104,6 +111,10 @@ export function useAppleWatchBluetooth(): UseAppleWatchBluetoothReturn {
   }, [isSupported, isIOSSafari, handleHRNotification]);
 
   const disconnect = useCallback(() => {
+    if (stalenessTimerRef.current) {
+      clearTimeout(stalenessTimerRef.current);
+      stalenessTimerRef.current = null;
+    }
     if (charRef.current) {
       charRef.current.removeEventListener("characteristicvaluechanged", handleHRNotification);
       try { charRef.current.stopNotifications(); } catch {}

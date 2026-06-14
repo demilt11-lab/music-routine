@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { 
-  Calendar, 
-  Clock, 
-  Sparkles, 
-  TrendingUp, 
+import {
+  Calendar,
+  Clock,
+  Sparkles,
+  TrendingUp,
   Zap,
   ChevronRight,
   Target,
@@ -20,6 +20,33 @@ import {
 } from "lucide-react";
 import { useSmartScheduling } from "@/hooks/useSmartScheduling";
 import { format, isToday, isTomorrow, formatDistanceToNow } from "date-fns";
+
+interface ScheduleSuggestion {
+  id: string;
+  activityName: string;
+  activityIcon: string;
+  suggestedDate: Date;
+  suggestedHour: number;
+  confidence: number;
+  reasoning: string;
+  historicalFlowScore: number;
+  expectedDuration: number;
+}
+
+interface ActivityOptimalWindow {
+  activityName: string;
+  activityIcon: string;
+  bestDays: { day: string; dayIndex: number; score: number }[];
+  bestHours: { hour: number; score: number }[];
+  avgFlowScore: number;
+  successRate: number;
+}
+
+interface WeeklySlot {
+  id: string;
+  activityIcon: string;
+  suggestedHour: number;
+}
 
 const formatHour = (hour: number) => {
   if (hour === 0) return "12 AM";
@@ -203,7 +230,7 @@ export const SmartScheduler = forwardRef<HTMLDivElement>((_, ref) => {
   );
 });
 
-const SuggestionCard = React.forwardRef<HTMLDivElement, { suggestion: any }>(
+const SuggestionCard = React.forwardRef<HTMLDivElement, { suggestion: ScheduleSuggestion }>(
   ({ suggestion, ...props }, ref) => {
     return (
       <div ref={ref} {...props} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
@@ -238,7 +265,7 @@ const SuggestionCard = React.forwardRef<HTMLDivElement, { suggestion: any }>(
 );
 SuggestionCard.displayName = "SuggestionCard";
 
-function WeeklyScheduleView({ schedule }: { schedule: { day: string; slots: any[] }[] }) {
+function WeeklyScheduleView({ schedule }: { schedule: { day: string; slots: WeeklySlot[] }[] }) {
   const today = new Date().getDay();
   const dayAbbreviations: { [key: string]: string } = {
     Sunday: "Sun",
@@ -296,7 +323,7 @@ function WeeklyScheduleView({ schedule }: { schedule: { day: string; slots: any[
   );
 }
 
-function ActivityPatternsView({ activityWindows }: { activityWindows: any[] }) {
+function ActivityPatternsView({ activityWindows }: { activityWindows: ActivityOptimalWindow[] }) {
   return (
     <ScrollArea className="h-[300px]">
       <div className="space-y-4 pr-4">
@@ -319,7 +346,7 @@ function ActivityPatternsView({ activityWindows }: { activityWindows: any[] }) {
               <div>
                 <span className="text-xs text-muted-foreground">Best Days</span>
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {activity.bestDays.slice(0, 3).map((day: any) => (
+                  {activity.bestDays.slice(0, 3).map((day) => (
                     <Badge key={day.day} variant="secondary" className="text-xs">
                       {day.day.slice(0, 3)}
                     </Badge>
@@ -329,7 +356,7 @@ function ActivityPatternsView({ activityWindows }: { activityWindows: any[] }) {
               <div>
                 <span className="text-xs text-muted-foreground">Best Hours</span>
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {activity.bestHours.slice(0, 3).map((hour: any) => (
+                  {activity.bestHours.slice(0, 3).map((hour) => (
                     <Badge key={hour.hour} variant="secondary" className="text-xs">
                       {formatHour(hour.hour)}
                     </Badge>

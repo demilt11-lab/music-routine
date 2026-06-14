@@ -16,7 +16,7 @@ import {
   Timer, Calendar
 } from 'lucide-react';
 import { usePredictiveQueue } from '@/hooks/usePredictiveQueue';
-import { useJamendo, JamendoTrack } from '@/hooks/useJamendo';
+import { useJamendo, type JamendoTrack } from '@/hooks/useJamendo';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -29,7 +29,7 @@ interface PredictiveQueueBuilderProps {
     heartRate: number;
   };
   goalFlowScore?: number;
-  onQueueReady?: (tracks: any[]) => void;
+  onQueueReady?: (tracks: JamendoTrack[]) => void;
   isSessionActive?: boolean;
 }
 
